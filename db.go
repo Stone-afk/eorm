@@ -43,6 +43,7 @@ type DB struct {
 	core
 }
 
+
 // DBWithMiddlewares 为 db 配置 Middleware
 func DBWithMiddlewares(ms ...Middleware) DBOption {
 	return func(db *DB) {

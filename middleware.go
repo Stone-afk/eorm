@@ -26,6 +26,7 @@ type QueryContext struct {
 	q    *Query
 }
 
+
 func (qc *QueryContext) GetQuery() *Query {
 	return qc.q
 }

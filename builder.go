@@ -313,4 +313,5 @@ func (b *builder) buildColumn(c Column) error {
 		return errs.NewUnsupportedTableReferenceError(table)
 	}
 	return nil
+	}
 }
