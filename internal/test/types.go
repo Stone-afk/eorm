@@ -33,7 +33,7 @@ type SimpleStruct struct {
 	Int    int
 	IntPtr *int
 
-	Int8    int8 `eorm:"primary_key,column=int8_c"`
+	Int8    int8
 	Int8Ptr *int8
 
 	Int16    int16
@@ -124,8 +124,8 @@ func (j *JsonColumn) Scan(src any) error {
 }
 
 // Value 参考 sql.NullXXX 类型定义的
-func (j JsonColumn) Value() (driver.Value, error) {
-	if !j.Valid {
+func (j *JsonColumn) Value() (driver.Value, error) {
+	if j == nil || !j.Valid {
 		return nil, nil
 	}
 	bs, err := json.Marshal(j.Val)
@@ -203,4 +203,21 @@ func NewCombinedModel(id int64) *CombinedModel {
 		Age:       20,
 		LastName:  ekit.ToPtr[string]("Jerry" + fmt.Sprintln(id)),
 	}
+}
+
+type Order struct {
+	Id        int
+	UsingCol1 string
+	UsingCol2 string
+}
+
+type OrderDetail struct {
+	OrderId   int
+	ItemId    int
+	UsingCol1 string
+	UsingCol2 string
+}
+
+type Item struct {
+	Id int
 }

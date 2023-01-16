@@ -1,5 +1,6 @@
 create database if not exists `integration_test`;
-create table if not exists `integration_test`.`simple_struct`(
+create table if not exists `integration_test`.`simple_struct`
+(
     `id` bigint auto_increment,
     bool smallint not null,
     bool_ptr smallint,
@@ -43,12 +44,32 @@ create table if not exists `integration_test`.`simple_struct`(
 create table if not exists `integration_test`.`combined_model`
 (
     `id`          bigint auto_increment
-        primary key,
+    primary key,
     `first_name`  varchar(128) null,
     `age`         int          null,
     `last_name`   varchar(128) null,
     `create_time` bigint       null,
     `update_time` bigint       null
+    );
+create table if not exists `integration_test`.`order`
+(
+    `id`          bigint auto_increment
+        primary key,
+    `using_col1`  varchar(128) null,
+    `using_col2`  varchar(128) null
 );
 
+create table if not exists `integration_test`.`order_detail`
+(
+    `order_id`          bigint auto_increment
+        primary key,
+    `item_id`  bigint null,
+    `using_col1`  varchar(128) null,
+    `using_col2`  varchar(128) null
+);
 
+create table if not exists `integration_test`.`item`
+(
+    `id`          bigint auto_increment
+        primary key
+);

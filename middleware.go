@@ -26,6 +26,11 @@ type QueryContext struct {
 	q    *Query
 }
 
+
+func (qc *QueryContext) GetQuery() *Query {
+	return qc.q
+}
+
 type QueryResult struct {
 	Result any
 	Err    error

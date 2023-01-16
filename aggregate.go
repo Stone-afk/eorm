@@ -16,18 +16,21 @@ package eorm
 
 // Aggregate represents aggregate expression, including AVG, MAX, MIN...
 type Aggregate struct {
+	table    TableReference
 	fn       string
 	arg      string
 	alias    string
 	distinct bool
 }
 
-// As specifies the alias
+// As 指定别名。一般情况下，这个别名应该等同于列名，我们会将这个列名映射过去对应的字段名。
+// 例如说 alias= avg_age，默认情况下，我们会找 AvgAge 这个字段来接收值。
 func (a Aggregate) As(alias string) Selectable {
 	return Aggregate{
 		fn:    a.fn,
 		arg:   a.arg,
 		alias: alias,
+		table: a.table,
 	}
 }
 

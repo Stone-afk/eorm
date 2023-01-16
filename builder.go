@@ -53,7 +53,7 @@ type Querier[T any] struct {
 
 // RawQuery 创建一个 Querier 实例
 // 泛型参数 T 是目标类型。
-// 例如，如果查询 User 的数据，那么 T 就是 User
+// 例如，如果查询 User 的数据， 那么 T 就是 User
 func RawQuery[T any](sess session, sql string, args ...any) Querier[T] {
 	return Querier[T]{
 		core:    sess.getCore(),
@@ -130,6 +130,10 @@ func (b *builder) space() {
 	_ = b.buffer.WriteByte(' ')
 }
 
+func (b *builder) point() {
+	_ = b.buffer.WriteByte('.')
+}
+
 func (b *builder) writeString(val string) {
 	_, _ = b.buffer.WriteString(val)
 }
@@ -160,28 +164,18 @@ func (b *builder) buildExpr(expr Expr) error {
 	case RawExpr:
 		b.buildRawExpr(e)
 	case Column:
-		if e.name != "" {
-			_, ok := b.aliases[e.name]
-			if ok {
-				b.quote(e.name)
-				return nil
-			}
-			cm, ok := b.meta.FieldMap[e.name]
-			if !ok {
-				return errs.NewInvalidFieldError(e.name)
-			}
-			b.quote(cm.ColumnName)
+		_, ok := b.aliases[e.name]
+		if ok {
+			b.quote(e.name)
+			return nil
 		}
+		return b.buildColumn(e)
 	case Aggregate:
 		if err := b.buildHavingAggregate(e); err != nil {
 			return err
 		}
 	case valueExpr:
 		b.parameter(e.val)
-	case MathExpr:
-		if err := b.buildBinaryExpr(binaryExpr(e)); err != nil {
-			return err
-		}
 	case binaryExpr:
 		if err := b.buildBinaryExpr(e); err != nil {
 			return err
@@ -247,12 +241,6 @@ func (b *builder) buildSubExpr(subExpr Expr) error {
 			return err
 		}
 		_ = b.buffer.WriteByte(')')
-	case binaryExpr:
-		_ = b.buffer.WriteByte('(')
-		if err := b.buildBinaryExpr(r); err != nil {
-			return err
-		}
-		_ = b.buffer.WriteByte(')')
 	case Predicate:
 		_ = b.buffer.WriteByte('(')
 		if err := b.buildBinaryExpr(binaryExpr(r)); err != nil {
@@ -288,4 +276,42 @@ func (q Querier[T]) GetMulti(ctx context.Context) ([]*T, error) {
 		return nil, res.Err
 	}
 	return res.Result.([]*T), nil
+}
+
+func (b *builder) buildColumn(c Column) error {
+	switch table := c.table.(type) {
+	case nil:
+		fd, ok := b.meta.FieldMap[c.name]
+		// 字段不对，或者说列不对
+		if !ok {
+			return errs.NewInvalidFieldError(c.name)
+		}
+		b.quote(fd.ColumnName)
+		if c.alias != "" {
+			b.writeString(" AS ")
+			b.quote(c.alias)
+		}
+	case Table:
+		m, err := b.metaRegistry.Get(table.entity)
+		if err != nil {
+			return err
+		}
+		fd, ok := m.FieldMap[c.name]
+		if !ok {
+			return errs.NewInvalidFieldError(c.name)
+		}
+		if table.alias != "" {
+			b.quote(table.alias)
+			b.writeByte('.')
+		}
+		b.quote(fd.ColumnName)
+		if c.alias != "" {
+			b.writeString(" AS ")
+			b.quote(c.alias)
+		}
+	default:
+		return errs.NewUnsupportedTableReferenceError(table)
+	}
+	return nil
+	}
 }
