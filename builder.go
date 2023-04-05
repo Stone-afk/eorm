@@ -18,8 +18,11 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/ecodeclub/eorm/internal/datasource"
+
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/query"
 	"github.com/valyala/bytebufferpool"
 )
 
@@ -27,28 +30,27 @@ var _ Executor = &Inserter[any]{}
 var _ Executor = &Updater[any]{}
 var _ Executor = &Deleter[any]{}
 
+var EmptyQuery = Query{}
+
 // Query 代表一个查询
-type Query struct {
-	SQL  string
-	Args []any
-}
+type Query = query.Query
 
 // Querier 查询器，代表最基本的查询
 type Querier[T any] struct {
 	core
-	session
+	Session
 	qc *QueryContext
 }
 
 // RawQuery 创建一个 Querier 实例
 // 泛型参数 T 是目标类型。
 // 例如，如果查询 User 的数据， 那么 T 就是 User
-func RawQuery[T any](sess session, sql string, args ...any) Querier[T] {
+func RawQuery[T any](sess Session, sql string, args ...any) Querier[T] {
 	return Querier[T]{
 		core:    sess.getCore(),
-		session: sess,
+		Session: sess,
 		qc: &QueryContext{
-			q: &Query{
+			q: Query{
 				SQL:  sql,
 				Args: args,
 			},
@@ -57,10 +59,10 @@ func RawQuery[T any](sess session, sql string, args ...any) Querier[T] {
 	}
 }
 
-func newQuerier[T any](sess session, q *Query, meta *model.TableMeta, typ string) Querier[T] {
+func newQuerier[T any](sess Session, q Query, meta *model.TableMeta, typ string) Querier[T] {
 	return Querier[T]{
 		core:    sess.getCore(),
-		session: sess,
+		Session: sess,
 		qc: &QueryContext{
 			q:    q,
 			meta: meta,
@@ -72,7 +74,7 @@ func newQuerier[T any](sess session, q *Query, meta *model.TableMeta, typ string
 // Exec 执行 SQL
 func (q Querier[T]) Exec(ctx context.Context) Result {
 	var handler HandleFunc = func(ctx context.Context, qc *QueryContext) *QueryResult {
-		res, err := q.session.execContext(ctx, qc.q.SQL, qc.q.Args...)
+		res, err := q.Session.execContext(ctx, datasource.Query(qc.q))
 		return &QueryResult{Result: res, Err: err}
 	}
 
@@ -92,7 +94,7 @@ func (q Querier[T]) Exec(ctx context.Context) Result {
 // 注意在不同的数据库里面，排序可能会不同
 // 在没有查找到数据的情况下，会返回 ErrNoRows
 func (q Querier[T]) Get(ctx context.Context) (*T, error) {
-	res := get[T](ctx, q.session, q.core, q.qc)
+	res := get[T](ctx, q.Session, q.core, q.qc)
 	if res.Err != nil {
 		return nil, res.Err
 	}
@@ -278,7 +280,7 @@ func (b *builder) buildIns(is values) error {
 }
 
 func (q Querier[T]) GetMulti(ctx context.Context) ([]*T, error) {
-	res := getMulti[T](ctx, q.session, q.core, q.qc)
+	res := getMulti[T](ctx, q.Session, q.core, q.qc)
 	if res.Err != nil {
 		return nil, res.Err
 	}
@@ -326,16 +328,16 @@ func (b *builder) buildColumn(c Column) error {
 // buildSubquery 構建子查詢 SQL，
 // useAlias 決定是否顯示別名，即使有別名
 func (b *builder) buildSubquery(sub Subquery, useAlias bool) error {
-	query, err := sub.q.Build()
+	q, err := sub.q.Build()
 	if err != nil {
 		return err
 	}
 	b.writeByte('(')
 	// 拿掉最後 ';'
-	b.writeString(query.SQL[:len(query.SQL)-1])
+	b.writeString(q.SQL[:len(q.SQL)-1])
 	// 因為有 build() ，所以理應 args 也需要跟 SQL 一起處理
-	if len(query.Args) > 0 {
-		b.addArgs(query.Args...)
+	if len(q.Args) > 0 {
+		b.addArgs(q.Args...)
 	}
 	b.writeByte(')')
 	if useAlias {

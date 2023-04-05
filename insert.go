@@ -23,24 +23,26 @@ import (
 	"github.com/valyala/bytebufferpool"
 )
 
+var _ QueryBuilder = &Inserter[any]{}
+
 // Inserter is used to construct an insert query
 // More details check Build function
 type Inserter[T any] struct {
 	builder
-	session
+	Session
 	columns  []string
 	values   []*T
 	ignorePK bool
 }
 
 // NewInserter 开始构建一个 INSERT 查询
-func NewInserter[T any](sess session) *Inserter[T] {
+func NewInserter[T any](sess Session) *Inserter[T] {
 	return &Inserter[T]{
 		builder: builder{
 			core:   sess.getCore(),
 			buffer: bytebufferpool.Get(),
 		},
-		session: sess,
+		Session: sess,
 	}
 }
 
@@ -53,22 +55,22 @@ func (i *Inserter[T]) SkipPK() *Inserter[T] {
 // notes:
 // - All the values from function Values should have the same type.
 // - It will insert all columns including auto-increment primary key
-func (i *Inserter[T]) Build() (*Query, error) {
+func (i *Inserter[T]) Build() (Query, error) {
 	defer bytebufferpool.Put(i.buffer)
 	var err error
 	if len(i.values) == 0 {
-		return &Query{}, errors.New("插入0行")
+		return EmptyQuery, errors.New("插入0行")
 	}
 	i.writeString("INSERT INTO ")
 	i.meta, err = i.metaRegistry.Get(i.values[0])
 	if err != nil {
-		return &Query{}, err
+		return EmptyQuery, err
 	}
 	i.quote(i.meta.TableName)
 	i.writeString("(")
 	fields, err := i.buildColumns()
 	if err != nil {
-		return nil, err
+		return EmptyQuery, err
 	}
 	i.writeString(")")
 	i.writeString(" VALUES")
@@ -77,11 +79,11 @@ func (i *Inserter[T]) Build() (*Query, error) {
 			i.comma()
 		}
 		i.writeString("(")
-		refVal := i.valCreator.NewBasicTypeValue(val, i.meta)
+		refVal := i.valCreator.NewPrimitiveValue(val, i.meta)
 		for j, v := range fields {
 			fdVal, err := refVal.Field(v.FieldName)
 			if err != nil {
-				return nil, err
+				return EmptyQuery, err
 			}
 			i.parameter(fdVal.Interface())
 			if j != len(fields)-1 {
@@ -91,7 +93,7 @@ func (i *Inserter[T]) Build() (*Query, error) {
 		i.writeString(")")
 	}
 	i.end()
-	return &Query{SQL: i.buffer.String(), Args: i.args}, nil
+	return Query{SQL: i.buffer.String(), Args: i.args}, nil
 }
 
 // Columns specifies the columns that need to be inserted
@@ -116,7 +118,7 @@ func (i *Inserter[T]) Exec(ctx context.Context) Result {
 	if err != nil {
 		return Result{err: err}
 	}
-	return newQuerier[T](i.session, query, i.meta, INSERT).Exec(ctx)
+	return newQuerier[T](i.Session, query, i.meta, INSERT).Exec(ctx)
 }
 
 func (i *Inserter[T]) buildColumns() ([]*model.ColumnMeta, error) {

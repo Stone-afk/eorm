@@ -17,11 +17,15 @@ package roundrobin
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strconv"
 	"sync/atomic"
 
+	"go.uber.org/multierr"
+
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+
 	"github.com/ecodeclub/eorm/internal/errs"
-	"github.com/ecodeclub/eorm/internal/slaves"
 )
 
 type Slaves struct {
@@ -33,10 +37,7 @@ func (r *Slaves) Next(ctx context.Context) (slaves.Slave, error) {
 	if ctx.Err() != nil {
 		return slaves.Slave{}, ctx.Err()
 	}
-	if r == nil {
-		return slaves.Slave{}, errs.ErrSlaveNotFound
-	}
-	if len(r.slaves) == 0 {
+	if r == nil || len(r.slaves) == 0 {
 		return slaves.Slave{}, errs.ErrSlaveNotFound
 	}
 	cnt := atomic.AddUint32(&r.cnt, 1)
@@ -44,15 +45,26 @@ func (r *Slaves) Next(ctx context.Context) (slaves.Slave, error) {
 	return r.slaves[index], nil
 }
 
-func NewSlaves(slavedbs ...*sql.DB) *Slaves {
+func (r *Slaves) Close() error {
+	var err error
+	for _, inst := range r.slaves {
+		if er := inst.Close(); er != nil {
+			err = multierr.Combine(
+				err, fmt.Errorf("slave DB name [%s] error: %w", inst.SlaveName, er))
+		}
+	}
+	return err
+}
+
+func NewSlaves(dbs ...*sql.DB) (*Slaves, error) {
 	r := &Slaves{}
-	r.slaves = make([]slaves.Slave, 0, len(slavedbs))
-	for idx, slavedb := range slavedbs {
+	r.slaves = make([]slaves.Slave, 0, len(dbs))
+	for idx, db := range dbs {
 		s := slaves.Slave{
 			SlaveName: strconv.Itoa(idx),
-			DB:        slavedb,
+			DB:        db,
 		}
 		r.slaves = append(r.slaves, s)
 	}
-	return r
+	return r, nil
 }

@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
+
 	"github.com/ecodeclub/eorm"
 	"github.com/ecodeclub/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
@@ -32,15 +34,14 @@ type MasterSlaveSelectTestSuite struct {
 	data []*test.SimpleStruct
 }
 
-func (m *MasterSlaveSelectTestSuite) SetupSuite() {
-	m.MasterSlaveSuite.SetupSuite()
-	m.data = append(m.data, test.NewSimpleStruct(1))
-	m.data = append(m.data, test.NewSimpleStruct(2))
-	m.data = append(m.data, test.NewSimpleStruct(3))
-	res := eorm.NewInserter[test.SimpleStruct](m.orm).Values(m.data...).Exec(context.Background())
+func (s *MasterSlaveSelectTestSuite) SetupSuite() {
+	s.MasterSlaveSuite.SetupSuite()
+	s.data = append(s.data, test.NewSimpleStruct(1))
+	s.data = append(s.data, test.NewSimpleStruct(2))
+	s.data = append(s.data, test.NewSimpleStruct(3))
+	res := eorm.NewInserter[test.SimpleStruct](s.orm).Values(s.data...).Exec(context.Background())
 	if res.Err() != nil {
-		m.T().Fatal(res.Err())
-		m.T()
+		s.T().Fatal(res.Err())
 	}
 }
 
@@ -66,20 +67,20 @@ func (s *MasterSlaveSelectTestSuite) TestMasterSlave() {
 			wantRes: s.data,
 			ctx: func() context.Context {
 				c := context.Background()
-				c = eorm.UseMaster(c)
+				c = masterslave.UseMaster(c)
 				return c
 			},
 		},
 		// TODO 从库测试目前有查不到数据的bug
-		//{
-		//	name:      "query use slave",
-		//	i:         eorm.NewSelector[test.SimpleStruct](s.orm).Where(eorm.C("Id").LT(4)),
-		//	wantSlave: "0",
-		//	wantRes:   s.data,
-		//	ctx: func() context.Context {
-		//		return context.Background()
-		//	},
-		//},
+		{
+			name:      "query use slave",
+			i:         eorm.NewSelector[test.SimpleStruct](s.orm).Where(eorm.C("Id").LT(4)),
+			wantSlave: "0",
+			wantRes:   s.data,
+			ctx: func() context.Context {
+				return context.Background()
+			},
+		},
 	}
 	for _, tc := range testcases {
 		s.T().Run(tc.name, func(t *testing.T) {
@@ -93,7 +94,7 @@ func (s *MasterSlaveSelectTestSuite) TestMasterSlave() {
 			assert.Equal(t, tc.wantRes, res)
 			slaveName := ""
 			select {
-			case slaveName = <-s.slaveNamegeter.ch:
+			case slaveName = <-s.testSlaves.ch:
 			default:
 			}
 			assert.Equal(t, tc.wantSlave, slaveName)
@@ -104,9 +105,80 @@ func (s *MasterSlaveSelectTestSuite) TestMasterSlave() {
 func TestMasterSlaveSelect(t *testing.T) {
 	suite.Run(t, &MasterSlaveSelectTestSuite{
 		MasterSlaveSuite: MasterSlaveSuite{
-			driver:    "mysql",
-			masterdsn: "root:root@tcp(localhost:13307)/integration_test",
-			slavedsns: []string{"root:root@tcp(localhost:13308)/integration_test"},
+			driver:     "mysql",
+			masterDsn:  "root:root@tcp(localhost:13307)/integration_test",
+			slaveDsns:  []string{"root:root@tcp(localhost:13308)/integration_test"},
+			initSlaves: newRoundRobinSlaves,
 		},
 	})
+	suite.Run(t, &MasterSlaveDNSTestSuite{
+		MasterSlaveSuite: MasterSlaveSuite{
+			driver:     "mysql",
+			masterDsn:  "root:root@tcp(localhost:13307)/integration_test",
+			slaveDsns:  []string{"root:root@tcp(slave.a.com:13308)/integration_test"},
+			initSlaves: newDnsSlaves,
+		},
+	})
+}
+
+type MasterSlaveDNSTestSuite struct {
+	MasterSlaveSuite
+	data []*test.SimpleStruct
+}
+
+func (m *MasterSlaveDNSTestSuite) SetupSuite() {
+	m.MasterSlaveSuite.SetupSuite()
+	m.data = append(m.data, test.NewSimpleStruct(1))
+	m.data = append(m.data, test.NewSimpleStruct(2))
+	m.data = append(m.data, test.NewSimpleStruct(3))
+	res := eorm.NewInserter[test.SimpleStruct](m.orm).Values(m.data...).Exec(context.Background())
+	if res.Err() != nil {
+		m.T().Fatal(res.Err())
+	}
+}
+func (s *MasterSlaveDNSTestSuite) TearDownSuite() {
+	res := eorm.RawQuery[any](s.orm, "DELETE FROM `simple_struct`").Exec(context.Background())
+	if res.Err() != nil {
+		s.T().Fatal(res.Err())
+	}
+}
+
+func (s *MasterSlaveDNSTestSuite) TestDNSMasterSlave() {
+	testcases := []struct {
+		name      string
+		i         *eorm.Selector[test.SimpleStruct]
+		wantErr   error
+		wantRes   []*test.SimpleStruct
+		wantSlave string
+		ctx       func() context.Context
+	}{
+		// TODO 从库测试目前有查不到数据的bug
+		{
+			name:      "get slave with dns",
+			i:         eorm.NewSelector[test.SimpleStruct](s.orm).Where(eorm.C("Id").LT(4)),
+			wantSlave: "0",
+			wantRes:   s.data,
+			ctx: func() context.Context {
+				return context.Background()
+			},
+		},
+	}
+	for _, tc := range testcases {
+		s.T().Run(tc.name, func(t *testing.T) {
+			ctx := tc.ctx()
+			time.Sleep(time.Second)
+			res, err := tc.i.GetMulti(ctx)
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantRes, res)
+			slaveName := ""
+			select {
+			case slaveName = <-s.testSlaves.ch:
+			default:
+			}
+			assert.Equal(t, tc.wantSlave, slaveName)
+		})
+	}
 }

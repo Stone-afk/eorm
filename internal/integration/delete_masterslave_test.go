@@ -70,7 +70,7 @@ func (s *DeleteMasterSlaveTestSuite) TestDeleter() {
 			affected, err := res.RowsAffected()
 			slaveName := ""
 			select {
-			case slaveName = <-s.slaveNamegeter.ch:
+			case slaveName = <-s.testSlaves.ch:
 			default:
 			}
 			require.Nil(t, err)
@@ -84,9 +84,10 @@ func (s *DeleteMasterSlaveTestSuite) TestDeleter() {
 func TestMasterSlaveDelete(t *testing.T) {
 	suite.Run(t, &DeleteMasterSlaveTestSuite{
 		MasterSlaveSuite: MasterSlaveSuite{
-			driver:    "mysql",
-			masterdsn: "root:root@tcp(localhost:13307)/integration_test",
-			slavedsns: []string{"root:root@tcp(localhost:13308)/integration_test"},
+			driver:     "mysql",
+			masterDsn:  "root:root@tcp(localhost:13307)/integration_test",
+			slaveDsns:  []string{"root:root@tcp(localhost:13308)/integration_test"},
+			initSlaves: newRoundRobinSlaves,
 		},
 	})
 }

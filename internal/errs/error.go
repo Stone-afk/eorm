@@ -31,13 +31,17 @@ var (
 	ErrCombinationIsNotStruct     = errors.New("eorm: 不支持的组合类型，eorm 只支持结构体组合")
 	ErrMissingShardingKey         = errors.New("eorm: sharding key 未设置")
 	ErrOnlyResultOneQuery         = errors.New("eorm: 只能生成一个 SQL")
-	ErrNotGenShardingQuery        = errors.New("eorm: 未生成 sharding query")
 	ErrUnsupportedTooComplexQuery = errors.New("eorm: 暂未支持太复杂的查询")
-	ErrExcShardingAlgorithm       = errors.New("eorm: 执行 sharding algorithm 出错")
-	ErrCtxGetDBName               = errors.New("eorm: ctx 获取目标 dbName 出错")
-	ErrNotFoundTargetDB           = errors.New("eorm: 未发现目标 DB")
-	ErrNotFoundTargetTable        = errors.New("eorm: 未发现目标 Table")
 	ErrSlaveNotFound              = errors.New("eorm: slave不存在")
+	ErrNotFoundTargetDataSource   = errors.New("eorm: 未发现目标 data source")
+	ErrNotFoundTargetDB           = errors.New("eorm: 未发现目标 DB")
+	ErrNotGenShardingQuery        = errors.New("eorm: 未生成 sharding query")
+	ErrNotCompleteDatasource      = errors.New("eorm: 未实现 DataSource 接口")
+	ErrNotCompleteTxBeginner      = errors.New("eorm: 未实现 TxBeginner 接口")
+
+	// ErrInvalidQuery               = errors.New("eorm: 未知 query")
+
+	// ErrExcShardingAlgorithm       = errors.New("eorm: 执行 sharding algorithm 出错")
 )
 
 func NewFieldConflictError(field string) error {
@@ -86,5 +90,8 @@ func NewUnsupportedOperatorError(op string) error {
 
 func NewInvalidDSNError(dsn string) error {
 	return fmt.Errorf("eorm: 不正确的 DSN %s", dsn)
+}
 
+func NewFailedToGetSlavesFromDNS(err error) error {
+	return fmt.Errorf("eorm: 从DNS中解析从库失败 %w", err)
 }

@@ -14,7 +14,12 @@
 
 package eorm
 
-import "context"
+import (
+	"context"
+	"database/sql"
+
+	"github.com/ecodeclub/eorm/internal/datasource"
+)
 
 // Executor sql 语句执行器
 type Executor interface {
@@ -23,10 +28,12 @@ type Executor interface {
 
 // QueryBuilder 普通 sql 构造抽象
 type QueryBuilder interface {
-	Build() (*Query, error)
+	Build() (Query, error)
 }
 
-// ShardingQueryBuilder  sharding sql 构造抽象
-type ShardingQueryBuilder interface {
-	Build() ([]*ShardingQuery, error)
+// Session 代表一个抽象的概念，即会话
+type Session interface {
+	getCore() core
+	queryContext(ctx context.Context, query datasource.Query) (*sql.Rows, error)
+	execContext(ctx context.Context, query datasource.Query) (sql.Result, error)
 }

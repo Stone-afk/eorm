@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ecodeclub/eorm/internal/slaves/dns/mysql"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/dns/mysql"
 
 	"github.com/ecodeclub/eorm/internal/errs"
 
@@ -29,12 +29,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func ExampleSlaves_Close() {
+	resolver := &mockResolver{
+		m: map[string][]string{
+			"slaves.mycompany.com": {"192.168.1.1", "192.168.1.2", "192.168.1.3"},
+		},
+		mu: &sync.RWMutex{},
+	}
+	sl, _ := NewSlaves("root:root@tcp(slaves.mycompany.com:13308)/integration_test",
+		withResolver(resolver))
+
+	err := sl.Close()
+	if err == nil {
+		fmt.Println("close")
+	}
+
+	// Output:
+	// close
+}
+
 type mockResolver struct {
 	mu *sync.RWMutex
 	m  map[string][]string
 }
 
-func (m *mockResolver) LookupAddr(ctx context.Context, domain string) ([]string, error) {
+func (m *mockResolver) LookupHost(ctx context.Context, domain string) ([]string, error) {
 	if ctx.Err() != nil {
 		return []string{}, ctx.Err()
 	}
@@ -86,7 +105,8 @@ func TestGetSlaves(t *testing.T) {
 				return
 			}
 			assert.Equal(t, tc.wantSlavednss, s.getSlaveDsns())
-			s.Close()
+			err = s.Close()
+			assert.NoError(t, err)
 
 		})
 	}

@@ -61,7 +61,7 @@ func (i *InsertMasterSlaveTestSuite) TestInsert() {
 			}
 			slaveName := ""
 			select {
-			case slaveName = <-i.slaveNamegeter.ch:
+			case slaveName = <-i.testSlaves.ch:
 			default:
 			}
 			affected, err := res.RowsAffected()
@@ -74,9 +74,10 @@ func (i *InsertMasterSlaveTestSuite) TestInsert() {
 func TestMasterSlaveInsert(t *testing.T) {
 	suite.Run(t, &InsertMasterSlaveTestSuite{
 		MasterSlaveSuite: MasterSlaveSuite{
-			driver:    "mysql",
-			masterdsn: "root:root@tcp(localhost:13307)/integration_test",
-			slavedsns: []string{"root:root@tcp(localhost:13308)/integration_test"},
+			driver:     "mysql",
+			masterDsn:  "root:root@tcp(localhost:13307)/integration_test",
+			slaveDsns:  []string{"root:root@tcp(localhost:13308)/integration_test"},
+			initSlaves: newRoundRobinSlaves,
 		},
 	})
 }

@@ -25,10 +25,12 @@ import (
 	"github.com/valyala/bytebufferpool"
 )
 
+var _ QueryBuilder = &Updater[any]{}
+
 // Updater is the builder responsible for building UPDATE query
 type Updater[T any] struct {
 	builder
-	session
+	Session
 	table         interface{}
 	val           valuer.Value
 	where         []Predicate
@@ -38,13 +40,13 @@ type Updater[T any] struct {
 }
 
 // NewUpdater 开始构建一个 UPDATE 查询
-func NewUpdater[T any](sess session) *Updater[T] {
+func NewUpdater[T any](sess Session) *Updater[T] {
 	return &Updater[T]{
 		builder: builder{
 			core:   sess.getCore(),
 			buffer: bytebufferpool.Get(),
 		},
-		session: sess,
+		Session: sess,
 	}
 }
 
@@ -54,7 +56,7 @@ func (u *Updater[T]) Update(val *T) *Updater[T] {
 }
 
 // Build returns UPDATE query
-func (u *Updater[T]) Build() (*Query, error) {
+func (u *Updater[T]) Build() (Query, error) {
 	defer bytebufferpool.Put(u.buffer)
 	var err error
 	t := new(T)
@@ -63,10 +65,10 @@ func (u *Updater[T]) Build() (*Query, error) {
 	}
 	u.meta, err = u.metaRegistry.Get(t)
 	if err != nil {
-		return nil, err
+		return EmptyQuery, err
 	}
 
-	u.val = u.valCreator.NewBasicTypeValue(u.table, u.meta)
+	u.val = u.valCreator.NewPrimitiveValue(u.table, u.meta)
 	u.args = make([]interface{}, 0, len(u.meta.Columns))
 
 	u.writeString("UPDATE ")
@@ -78,19 +80,19 @@ func (u *Updater[T]) Build() (*Query, error) {
 		err = u.buildAssigns()
 	}
 	if err != nil {
-		return nil, err
+		return EmptyQuery, err
 	}
 
 	if len(u.where) > 0 {
 		u.writeString(" WHERE ")
 		err = u.buildPredicates(u.where)
 		if err != nil {
-			return nil, err
+			return EmptyQuery, err
 		}
 	}
 
 	u.end()
-	return &Query{
+	return Query{
 		SQL:  u.buffer.String(),
 		Args: u.args,
 	}, nil
@@ -209,5 +211,5 @@ func (u *Updater[T]) Exec(ctx context.Context) Result {
 	if err != nil {
 		return Result{err: err}
 	}
-	return newQuerier[T](u.session, query, u.meta, UPDATE).Exec(ctx)
+	return newQuerier[T](u.Session, query, u.meta, UPDATE).Exec(ctx)
 }
