@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
 
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
-	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
 
 	"github.com/ecodeclub/eorm/internal/datasource/shardingsource"
 
@@ -4751,10 +4752,10 @@ func TestShardingSelector_GetMulti(t *testing.T) {
 	}
 	defer func() { _ = mockDB2.Close() }()
 
-	rbSlaves2, err := roundrobin.NewSlaves(mockDB2)
+	rbslaves, err := roundrobin.NewSlaves(mockDB2)
 	require.NoError(t, err)
 	masterSlaveDB2 := masterslave.NewMasterSlavesDB(
-		mockDB2, masterslave.MasterSlavesWithSlaves(newMockSlaveNameGet(rbSlaves2)))
+		mockDB2, masterslave.MasterSlavesWithSlaves(newMockSlaveNameGet(rbslaves)))
 	require.NoError(t, err)
 
 	clusterDB := cluster.NewClusterDB(map[string]*masterslave.MasterSlavesDB{
@@ -4844,16 +4845,16 @@ type Order struct {
 }
 
 type testSlaves struct {
-	slaves2.Slaves
+	slaves.Slaves
 }
 
-func newMockSlaveNameGet(s slaves2.Slaves) *testSlaves {
+func newMockSlaveNameGet(s slaves.Slaves) *testSlaves {
 	return &testSlaves{
 		Slaves: s,
 	}
 }
 
-func (s *testSlaves) Next(ctx context.Context) (slaves2.Slave, error) {
+func (s *testSlaves) Next(ctx context.Context) (slaves.Slave, error) {
 	slave, err := s.Slaves.Next(ctx)
 	if err != nil {
 		return slave, err
