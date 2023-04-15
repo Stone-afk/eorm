@@ -3414,12 +3414,6 @@ func TestShardingSelector_all_Build(t *testing.T) {
 			}(),
 			qs: []sharding.Query{
 				{
-					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_0`.`order_tab_0` WHERE `order_id`=?;",
-					Args:       []any{123},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id`=?) AND (`user_id`>?);",
 					Args:       []any{12, 133},
 					DB:         "order_db_0",
