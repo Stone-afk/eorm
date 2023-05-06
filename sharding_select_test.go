@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
 
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
-	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
 
 	"github.com/ecodeclub/eorm/internal/datasource/shardingsource"
 
@@ -6129,10 +6130,10 @@ func TestShardingSelector_GetMulti(t *testing.T) {
 	}
 	defer func() { _ = mockDB2.Close() }()
 
-	rbSlaves2, err := roundrobin.NewSlaves(mockDB2)
+	rbslaves, err := roundrobin.NewSlaves(mockDB2)
 	require.NoError(t, err)
 	masterSlaveDB2 := masterslave.NewMasterSlavesDB(
-		mockDB2, masterslave.MasterSlavesWithSlaves(newMockSlaveNameGet(rbSlaves2)))
+		mockDB2, masterslave.MasterSlavesWithSlaves(newMockSlaveNameGet(rbslaves)))
 	require.NoError(t, err)
 
 	clusterDB := cluster.NewClusterDB(map[string]*masterslave.MasterSlavesDB{
