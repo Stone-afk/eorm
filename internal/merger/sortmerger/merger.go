@@ -20,11 +20,13 @@ import (
 	"database/sql"
 	"reflect"
 	"sync"
-	_ "unsafe"
+
+	"github.com/ecodeclub/eorm/internal/merger"
+
+	"github.com/ecodeclub/eorm/internal/merger/utils"
 
 	"go.uber.org/multierr"
 
-	"github.com/ecodeclub/eorm/internal/merger"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 )
 
@@ -40,9 +42,6 @@ const (
 type Ordered interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~float32 | ~float64 | ~string
 }
-
-//go:linkname convertAssign database/sql.convertAssign
-func convertAssign(dest, src any) error
 
 type SortColumn struct {
 	name  string
@@ -132,25 +131,25 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 }
 
 func (m *Merger) initRows(results []*sql.Rows) (*Rows, error) {
-	rows := &Rows{
+	rs := &Rows{
 		rowsList:    results,
 		sortColumns: m.sortColumns,
 		mu:          &sync.RWMutex{},
 		columns:     m.cols,
 	}
 	h := &Heap{
-		h:           make([]*node, 0, len(rows.rowsList)),
-		sortColumns: rows.sortColumns,
+		h:           make([]*node, 0, len(rs.rowsList)),
+		sortColumns: rs.sortColumns,
 	}
-	rows.hp = h
-	for i := 0; i < len(rows.rowsList); i++ {
-		err := rows.nextRows(rows.rowsList[i], i)
+	rs.hp = h
+	for i := 0; i < len(rs.rowsList); i++ {
+		err := rs.nextRows(rs.rowsList[i], i)
 		if err != nil {
-			_ = rows.Close()
+			_ = rs.Close()
 			return nil, err
 		}
 	}
-	return rows, nil
+	return rs, nil
 }
 
 func (m *Merger) checkColumns(rows *sql.Rows) error {
@@ -193,18 +192,16 @@ func newNode(row *sql.Rows, sortCols sortColumns, index int) (*node, error) {
 	sortColumns := make([]any, sortCols.Len())
 	for _, colInfo := range colsInfo {
 		colName := colInfo.Name()
+		colType := colInfo.ScanType()
+		for colType.Kind() == reflect.Ptr {
+			colType = colType.Elem()
+		}
+		column := reflect.New(colType).Interface()
 		if sortCols.Has(colName) {
 			sortIndex := sortCols.Find(colName)
-			colType := colInfo.ScanType()
-			for colType.Kind() == reflect.Ptr {
-				colType = colType.Elem()
-			}
-			sortColumn := reflect.New(colType).Interface()
-			sortColumns[sortIndex] = sortColumn
-			columns = append(columns, sortColumn)
-		} else {
-			columns = append(columns, &[]byte{})
+			sortColumns[sortIndex] = column
 		}
+		columns = append(columns, column)
 	}
 	err = row.Scan(columns...)
 	if err != nil {
@@ -283,9 +280,9 @@ func (r *Rows) Scan(dest ...any) error {
 	if r.cur == nil {
 		return errs.ErrMergerScanNotNext
 	}
-
+	var err error
 	for i := 0; i < len(dest); i++ {
-		err := convertAssign(dest[i], r.cur.columns[i])
+		err = utils.ConvertAssign(dest[i], r.cur.columns[i])
 		if err != nil {
 			return err
 		}

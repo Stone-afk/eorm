@@ -12,25 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package valuer
+package utils
 
 import (
-	"reflect"
-
-	"github.com/ecodeclub/eorm/internal/rows"
-
-	"github.com/ecodeclub/eorm/internal/model"
+	"database/sql/driver"
+	_ "unsafe"
 )
 
-// Value 是对结构体实例的内部抽象
-type Value interface {
-	// Field 访问结构体字段, name 是字段名
-	Field(name string) (reflect.Value, error)
-	// SetColumns 设置新值，column 是列名
-	// 要注意，val 可能存在被上层复用，从而引起篡改的问题
-	// SetColumns(rows *sql.Rows) error
+//go:linkname sqlConvertAssign database/sql.convertAssign
+func sqlConvertAssign(dest, src any) error
 
-	SetColumns(rows rows.Rows) error
+func ConvertAssign(dest, src any) error {
+	srcVal, ok := src.(driver.Valuer)
+	if ok {
+		var err error
+		src, err = srcVal.Value()
+		if err != nil {
+			return err
+		}
+	}
+	return sqlConvertAssign(dest, src)
 }
-
-type Creator func(val any, meta *model.TableMeta) Value

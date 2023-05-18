@@ -24,15 +24,3 @@ type Aggregator interface {
 	// ColumnName 聚合函数的别名
 	ColumnName() string
 }
-
-type ColumnInfo struct {
-	Index int
-	Name  string
-}
-
-func NewColumnInfo(index int, name string) ColumnInfo {
-	return ColumnInfo{
-		Index: index,
-		Name:  name,
-	}
-}
