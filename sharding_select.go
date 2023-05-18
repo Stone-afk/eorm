@@ -20,7 +20,6 @@ import (
 	"sync"
 
 	"github.com/ecodeclub/eorm/internal/merger/batchmerger"
-
 	operator "github.com/ecodeclub/eorm/internal/operator"
 
 	"github.com/gotomicro/ekit/slice"
@@ -445,8 +444,8 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	}
 	var rowsSlice []*sql.Rows
 	var eg errgroup.Group
-	for _, query := range qs {
-		q := query
+	for _, qe := range qs {
+		q := qe
 		eg.Go(func() error {
 			s.lock.Lock()
 			defer s.lock.Unlock()
