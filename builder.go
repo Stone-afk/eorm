@@ -311,7 +311,6 @@ func (b *builder) buildColumn(c Column) error {
 		return errs.NewUnsupportedTableReferenceError(table)
 	}
 	return nil
-	}
 }
 
 // buildSubquery 構建子查詢 SQL，
