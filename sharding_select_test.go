@@ -4842,7 +4842,7 @@ func TestShardingSelector_Build(t *testing.T) {
 			},
 		},
 		{
-			name: "where and-or",
+			name: "where and-or all",
 			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
@@ -4865,7 +4865,7 @@ func TestShardingSelector_Build(t *testing.T) {
 			},
 		},
 		{
-			name: "where and-or broadcast",
+			name: "where and-or",
 			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
