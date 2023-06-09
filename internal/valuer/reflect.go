@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,11 +15,12 @@
 package valuer
 
 import (
-	"database/sql"
 	"reflect"
 
-	"github.com/gotomicro/eorm/internal/errs"
-	"github.com/gotomicro/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/rows"
+
+	"github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/model"
 )
 
 var _ Creator = NewReflectValue
@@ -40,12 +41,12 @@ func NewReflectValue(val interface{}, meta *model.TableMeta) Value {
 }
 
 // Field 返回字段值
-func (r reflectValue) Field(name string) (any, error) {
+func (r reflectValue) Field(name string) (reflect.Value, error) {
 	res, ok := r.fieldByIndex(name)
 	if !ok {
-		return nil, errs.NewInvalidFieldError(name)
+		return reflect.Value{}, errs.NewInvalidFieldError(name)
 	}
-	return res.Interface(), nil
+	return res, nil
 }
 
 func (r reflectValue) fieldByIndex(name string) (reflect.Value, bool) {
@@ -60,7 +61,7 @@ func (r reflectValue) fieldByIndex(name string) (reflect.Value, bool) {
 	return value, true
 }
 
-func (r reflectValue) SetColumns(rows *sql.Rows) error {
+func (r reflectValue) SetColumns(rows rows.Rows) error {
 	cs, err := rows.Columns()
 	if err != nil {
 		return err

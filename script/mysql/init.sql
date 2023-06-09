@@ -39,7 +39,7 @@ create table if not exists `integration_test`.`simple_struct`
     null_float64_ptr float,
     json_column varchar(2048),
     primary key (`id`)
-);
+    );
 
 create table if not exists `integration_test`.`combined_model`
 (
@@ -57,8 +57,7 @@ create table if not exists `integration_test`.`order`
         primary key,
     `using_col1`  varchar(128) null,
     `using_col2`  varchar(128) null
-);
-
+    );
 create table if not exists `integration_test`.`order_detail`
 (
     `order_id`          bigint auto_increment
@@ -66,10 +65,68 @@ create table if not exists `integration_test`.`order_detail`
     `item_id`  bigint null,
     `using_col1`  varchar(128) null,
     `using_col2`  varchar(128) null
-);
+    );
 
 create table if not exists `integration_test`.`item`
 (
     `id`          bigint auto_increment
         primary key
-);
+    );
+
+        /* sharding test */
+        create database if not exists `order_detail_db_0`;
+        create database if not exists `order_detail_db_1`;
+
+create table if not exists `order_detail_db_0`.`order_detail_tab_0`
+(
+    `order_id`          int(11) auto_increment
+    primary key,
+    `item_id`  int(11),
+    `using_col1`  varchar(128) null,
+    `using_col2`  varchar(128) null
+    );
+
+create table if not exists `order_detail_db_0`.`order_detail_tab_1`
+(
+    `order_id`          int(11) auto_increment
+    primary key,
+    `item_id`  int(11),
+    `using_col1`  varchar(128) null,
+    `using_col2`  varchar(128) null
+    );
+
+create table if not exists `order_detail_db_0`.`order_detail_tab_2`
+(
+    `order_id`          int(11) auto_increment
+    primary key,
+    `item_id`  int(11),
+    `using_col1`  varchar(128) null,
+    `using_col2`  varchar(128) null
+    );
+
+create table if not exists `order_detail_db_1`.`order_detail_tab_0`
+(
+    `order_id`          int(11) auto_increment
+    primary key,
+    `item_id`  int(11),
+    `using_col1`  varchar(128) null,
+    `using_col2`  varchar(128) null
+    );
+
+create table if not exists `order_detail_db_1`.`order_detail_tab_1`
+(
+    `order_id`          int(11) auto_increment
+    primary key,
+    `item_id`  int(11),
+    `using_col1`  varchar(128) null,
+    `using_col2`  varchar(128) null
+    );
+
+create table if not exists `order_detail_db_1`.`order_detail_tab_2`
+(
+    `order_id`          int(11) auto_increment
+    primary key,
+    `item_id`  int(11),
+    `using_col1`  varchar(128) null,
+    `using_col2`  varchar(128) null
+    );

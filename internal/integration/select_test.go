@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,11 +21,11 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/stretchr/testify/require"
 
-	"github.com/gotomicro/eorm"
-	"github.com/gotomicro/eorm/internal/test"
+	"github.com/ecodeclub/eorm"
+	"github.com/ecodeclub/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -41,7 +41,6 @@ func (s *SelectTestSuite) SetupSuite() {
 	res := eorm.NewInserter[test.SimpleStruct](s.orm).Values(s.data).Exec(context.Background())
 	if res.Err() != nil {
 		s.T().Fatal(res.Err())
-		s.T()
 	}
 }
 
@@ -89,7 +88,7 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 	testCases := []struct {
 		name     string
 		queryRes func() (any, error)
-		wantErr  error
+		wantErr  string
 		wantRes  any
 	}{
 		{
@@ -99,7 +98,7 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 					Where(eorm.C("Id").EQ(9))
 				return queryer.Get(context.Background())
 			},
-			wantErr: eorm.ErrNoRows,
+			wantErr: eorm.ErrNoRows.Error(),
 		},
 		{
 			name: "res int",
@@ -205,13 +204,36 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 				return &res
 			}(),
 		},
+		// TODO 测试出问题
+		{
+			name: "res *int accept NULL",
+			queryRes: func() (any, error) {
+				queryer := eorm.NewSelector[*int](s.orm).Select(eorm.C("Int32Ptr")).
+					From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
+					Where(eorm.C("Id").EQ(1))
+				return queryer.Get(context.Background())
+			},
+			wantRes: func() **int {
+				return new(*int)
+			}(),
+		},
+		{
+			name: "res int accept NULL",
+			queryRes: func() (any, error) {
+				queryer := eorm.NewSelector[*int](s.orm).Select(eorm.C("Int32Ptr")).
+					From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
+					Where(eorm.C("Id").EQ(1))
+				return queryer.Get(context.Background())
+			},
+			wantErr: "abc",
+		},
 	}
 
 	for _, tc := range testCases {
 		s.T().Run(tc.name, func(t *testing.T) {
 			res, err := tc.queryRes()
-			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
+				assert.EqualError(t, err, tc.wantErr)
 				return
 			}
 			assert.Equal(t, tc.wantRes, res)
@@ -1126,6 +1148,51 @@ func (s *SelectTestSuiteRightJoin) TestSelectorRightJoin() {
 				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("invalid").As("using_col1")).Get(context.Background())
 			},
 			wantErr: errs.NewInvalidFieldError("invalid"),
+		},
+		// 子查詢
+		{
+			name: "join & subquery",
+			s: func() (any, error) {
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				sub := eorm.NewSelector[test.OrderDetail](s.orm).AsSubquery("sub")
+				return eorm.NewSelector[test.Order](s.orm).
+					Select(eorm.C("Id"), sub.C("UsingCol1")).
+					From(t1.Join(sub).On(t1.C("Id").EQ(sub.C("OrderId")))).
+					Get(context.Background())
+			},
+			wantRes: &test.Order{Id: 1, UsingCol1: "usingcoa1_1", UsingCol2: ""},
+		},
+		{
+			name: "from",
+			s: func() (any, error) {
+				sub := eorm.NewSelector[test.OrderDetail](s.orm).AsSubquery("sub")
+				return eorm.NewSelector[test.Order](s.orm).
+					Select(sub.C("UsingCol1")).
+					From(sub).
+					Where().Get(context.Background())
+			},
+			wantRes: &test.Order{Id: 0, UsingCol1: "usingcoa1_1", UsingCol2: ""},
+		},
+		{
+			name: "in",
+			s: func() (any, error) {
+				sub := eorm.NewSelector[test.OrderDetail](s.orm).Select(eorm.C("OrderId")).AsSubquery("sub")
+				return eorm.NewSelector[test.Order](s.orm).
+					Select(eorm.Columns("Id")).Where(eorm.C("Id").In(sub)).
+					Get(context.Background())
+			},
+			wantRes: &test.Order{Id: 1, UsingCol1: "", UsingCol2: ""},
+		},
+		{
+			name: "all",
+			s: func() (any, error) {
+				sub := eorm.NewSelector[test.OrderDetail](s.orm).Select(eorm.C("OrderId")).AsSubquery("sub")
+				return eorm.NewSelector[test.Order](s.orm).
+					Select(eorm.Columns("Id")).
+					Where(eorm.C("Id").GT(eorm.All(sub))).
+					Get(context.Background())
+			},
+			wantErr: eorm.ErrNoRows,
 		},
 	}
 

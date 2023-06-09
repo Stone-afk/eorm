@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,12 +15,13 @@
 package valuer
 
 import (
-	"database/sql"
 	"reflect"
 	"unsafe"
 
-	"github.com/gotomicro/eorm/internal/errs"
-	"github.com/gotomicro/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/rows"
+
+	"github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/model"
 )
 
 var _ Creator = NewUnsafeValue
@@ -40,17 +41,17 @@ func NewUnsafeValue(val interface{}, meta *model.TableMeta) Value {
 	}
 }
 
-func (u unsafeValue) Field(name string) (interface{}, error) {
+func (u unsafeValue) Field(name string) (reflect.Value, error) {
 	fd, ok := u.meta.FieldMap[name]
 	if !ok {
-		return nil, errs.NewInvalidFieldError(name)
+		return reflect.Value{}, errs.NewInvalidFieldError(name)
 	}
 	ptr := unsafe.Pointer(uintptr(u.addr) + fd.Offset)
 	val := reflect.NewAt(fd.Typ, ptr).Elem()
-	return val.Interface(), nil
+	return val, nil
 }
 
-func (u unsafeValue) SetColumns(rows *sql.Rows) error {
+func (u unsafeValue) SetColumns(rows rows.Rows) error {
 
 	cs, err := rows.Columns()
 	if err != nil {

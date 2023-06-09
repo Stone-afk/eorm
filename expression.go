@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,6 +13,8 @@
 // limitations under the License.
 
 package eorm
+
+import operator "github.com/ecodeclub/eorm/internal/operator"
 
 // Expr is the top interface. It represents everything.
 type Expr interface {
@@ -49,7 +51,7 @@ func (RawExpr) selected() {}
 
 type binaryExpr struct {
 	left  Expr
-	op    op
+	op    operator.Op
 	right Expr
 }
 
@@ -85,5 +87,36 @@ func valueOf(val interface{}) Expr {
 		return v
 	default:
 		return valueExpr{val: val}
+	}
+}
+
+type SubqueryExpr struct {
+	s Subquery
+	// 謂詞： ALL、ANY、SOME
+	pred string
+}
+
+func (SubqueryExpr) expr() (string, error) {
+	panic("implement me")
+}
+
+func Any(sub Subquery) SubqueryExpr {
+	return SubqueryExpr{
+		s:    sub,
+		pred: "ANY",
+	}
+}
+
+func All(sub Subquery) SubqueryExpr {
+	return SubqueryExpr{
+		s:    sub,
+		pred: "ALL",
+	}
+}
+
+func Some(sub Subquery) SubqueryExpr {
+	return SubqueryExpr{
+		s:    sub,
+		pred: "SOME",
 	}
 }

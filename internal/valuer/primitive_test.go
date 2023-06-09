@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,18 +21,18 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/gotomicro/eorm/internal/errs"
-	"github.com/gotomicro/eorm/internal/model"
-	"github.com/gotomicro/eorm/internal/test"
+	"github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_basicTypeValue_Field(t *testing.T) {
-	testBasicValueField(t, BasicTypeCreator{Creator: NewUnsafeValue})
-	testBasicValueField(t, BasicTypeCreator{Creator: NewReflectValue})
+func Test_primitiveValue_Field(t *testing.T) {
+	testPrimitiveValueField(t, PrimitiveCreator{Creator: NewUnsafeValue})
+	testPrimitiveValueField(t, PrimitiveCreator{Creator: NewReflectValue})
 }
 
-func testBasicValueField(t *testing.T, creator BasicTypeCreator) {
+func testPrimitiveValueField(t *testing.T, creator PrimitiveCreator) {
 	meta, err := model.NewMetaRegistry().Get(&test.SimpleStruct{})
 	if err != nil {
 		t.Fatal(err)
@@ -40,7 +40,7 @@ func testBasicValueField(t *testing.T, creator BasicTypeCreator) {
 	t.Run("zero value", func(t *testing.T) {
 		entity := &test.SimpleStruct{}
 		testCases := newValueFieldTestCases(entity)
-		val := creator.NewBasicTypeValue(entity, meta)
+		val := creator.NewPrimitiveValue(entity, meta)
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				v, err := val.Field(tc.field)
@@ -48,14 +48,14 @@ func testBasicValueField(t *testing.T, creator BasicTypeCreator) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})
 	t.Run("normal value", func(t *testing.T) {
 		entity := test.NewSimpleStruct(1)
 		testCases := newValueFieldTestCases(entity)
-		val := creator.NewBasicTypeValue(entity, meta)
+		val := creator.NewPrimitiveValue(entity, meta)
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				v, err := val.Field(tc.field)
@@ -63,7 +63,7 @@ func testBasicValueField(t *testing.T, creator BasicTypeCreator) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})
@@ -87,7 +87,7 @@ func testBasicValueField(t *testing.T, creator BasicTypeCreator) {
 			t.Fatal(err)
 		}
 
-		val := creator.NewBasicTypeValue(&User{}, meta)
+		val := creator.NewPrimitiveValue(&User{}, meta)
 		for _, tc := range invalidCases {
 			t.Run(tc.name, func(t *testing.T) {
 				v, err := val.Field(tc.field)
@@ -95,7 +95,7 @@ func testBasicValueField(t *testing.T, creator BasicTypeCreator) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})
@@ -134,7 +134,7 @@ func testBasicValueField(t *testing.T, creator BasicTypeCreator) {
 			t.Fatal(err)
 		}
 
-		val := creator.NewBasicTypeValue(cUser, meta)
+		val := creator.NewPrimitiveValue(cUser, meta)
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				v, err := val.Field(tc.field)
@@ -142,13 +142,13 @@ func testBasicValueField(t *testing.T, creator BasicTypeCreator) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})
 }
 
-func Test_basicTypeValue_SetColumn(t *testing.T) {
+func Test_primitiveValue_SetColumn(t *testing.T) {
 	testCases := []struct {
 		name       string
 		cs         map[string][]byte
@@ -281,8 +281,8 @@ func Test_basicTypeValue_SetColumn(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer func() { _ = db.Close() }()
-			basicCreator := BasicTypeCreator{Creator: tc.valCreator}
-			val := basicCreator.NewBasicTypeValue(tc.val, meta)
+			basicCreator := PrimitiveCreator{Creator: tc.valCreator}
+			val := basicCreator.NewPrimitiveValue(tc.val, meta)
 			cols := make([]string, 0, len(tc.cs))
 			colVals := make([]driver.Value, 0, len(tc.cs))
 			for k, v := range tc.cs {

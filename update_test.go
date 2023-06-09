@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,8 +21,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/datasource/single"
+
 	"github.com/DATA-DOG/go-sqlmock"
-	err "github.com/gotomicro/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
@@ -35,17 +37,17 @@ func TestUpdater_Set(t *testing.T) {
 		Age:       18,
 		LastName:  &sql.NullString{String: "Jerry", Valid: true},
 	}
-	orm := memoryDB()
+	db := memoryDB()
 	testCases := []CommonTestCase{
 		{
 			name:     "no set and update",
-			builder:  NewUpdater[TestModel](orm),
+			builder:  NewUpdater[TestModel](db),
 			wantSql:  "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?,`last_name`=?;",
 			wantArgs: []interface{}{int64(0), "", int8(0), (*sql.NullString)(nil)},
 		},
 		{
 			name: "no set",
-			builder: NewUpdater[TestModel](orm).Update(&TestModel{
+			builder: NewUpdater[TestModel](db).Update(&TestModel{
 				Id:        12,
 				FirstName: "Tom",
 				Age:       18,
@@ -55,70 +57,70 @@ func TestUpdater_Set(t *testing.T) {
 		},
 		{
 			name:     "set columns",
-			builder:  NewUpdater[TestModel](orm).Update(tm).Set(Columns("FirstName", "Age")),
+			builder:  NewUpdater[TestModel](db).Update(tm).Set(Columns("FirstName", "Age")),
 			wantSql:  "UPDATE `test_model` SET `first_name`=?,`age`=?;",
 			wantArgs: []interface{}{"Tom", int8(18)},
 		},
 		{
 			name:    "set invalid columns",
-			builder: NewUpdater[TestModel](orm).Update(tm).Set(Columns("FirstNameInvalid", "Age")),
-			wantErr: err.NewInvalidFieldError("FirstNameInvalid"),
+			builder: NewUpdater[TestModel](db).Update(tm).Set(Columns("FirstNameInvalid", "Age")),
+			wantErr: errs.NewInvalidFieldError("FirstNameInvalid"),
 		},
 		{
 			name:     "set c2",
-			builder:  NewUpdater[TestModel](orm).Update(tm).Set(C("FirstName"), C("Age")),
+			builder:  NewUpdater[TestModel](db).Update(tm).Set(C("FirstName"), C("Age")),
 			wantSql:  "UPDATE `test_model` SET `first_name`=?,`age`=?;",
 			wantArgs: []interface{}{"Tom", int8(18)},
 		},
 		{
 			name:    "set invalid c2",
-			builder: NewUpdater[TestModel](orm).Update(tm).Set(C("FirstNameInvalid"), C("Age")),
-			wantErr: err.NewInvalidFieldError("FirstNameInvalid"),
+			builder: NewUpdater[TestModel](db).Update(tm).Set(C("FirstNameInvalid"), C("Age")),
+			wantErr: errs.NewInvalidFieldError("FirstNameInvalid"),
 		},
 		{
 			name:     "set assignment",
-			builder:  NewUpdater[TestModel](orm).Update(tm).Set(C("FirstName"), Assign("Age", 30)),
+			builder:  NewUpdater[TestModel](db).Update(tm).Set(C("FirstName"), Assign("Age", 30)),
 			wantSql:  "UPDATE `test_model` SET `first_name`=?,`age`=?;",
 			wantArgs: []interface{}{"Tom", 30},
 		},
 		{
 			name:    "set invalid assignment",
-			builder: NewUpdater[TestModel](orm).Update(tm).Set(C("FirstName"), Assign("InvalidAge", 30)),
-			wantErr: err.NewInvalidFieldError("InvalidAge"),
+			builder: NewUpdater[TestModel](db).Update(tm).Set(C("FirstName"), Assign("InvalidAge", 30)),
+			wantErr: errs.NewInvalidFieldError("InvalidAge"),
 		},
 		{
 			name:     "set age+1",
-			builder:  NewUpdater[TestModel](orm).Update(tm).Set(C("FirstName"), Assign("Age", C("Age").Add(1))),
+			builder:  NewUpdater[TestModel](db).Update(tm).Set(C("FirstName"), Assign("Age", C("Age").Add(1))),
 			wantSql:  "UPDATE `test_model` SET `first_name`=?,`age`=(`age`+?);",
 			wantArgs: []interface{}{"Tom", 1},
 		},
 		{
 			name:     "set age=id+1",
-			builder:  NewUpdater[TestModel](orm).Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Add(10))),
+			builder:  NewUpdater[TestModel](db).Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Add(10))),
 			wantSql:  "UPDATE `test_model` SET `first_name`=?,`age`=(`id`+?);",
 			wantArgs: []interface{}{"Tom", 10},
 		},
 		{
 			name:     "set age=id+(age*100)+10",
-			builder:  NewUpdater[TestModel](orm).Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Add(C("Age").Multi(100)).Add(10))),
+			builder:  NewUpdater[TestModel](db).Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Add(C("Age").Multi(100)).Add(10))),
 			wantSql:  "UPDATE `test_model` SET `first_name`=?,`age`=((`id`+(`age`*?))+?);",
 			wantArgs: []interface{}{"Tom", 100, 10},
 		},
 		{
 			name:     "set age=(id+(age*100))*110",
-			builder:  NewUpdater[TestModel](orm).Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Add(C("Age").Multi(100)).Multi(110))),
+			builder:  NewUpdater[TestModel](db).Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Add(C("Age").Multi(100)).Multi(110))),
 			wantSql:  "UPDATE `test_model` SET `first_name`=?,`age`=((`id`+(`age`*?))*?);",
 			wantArgs: []interface{}{"Tom", 100, 110},
 		},
 		{
 			name:     "not nil columns",
-			builder:  NewUpdater[TestModel](orm).Update(&TestModel{}).Set(AssignNotNilColumns(&TestModel{Id: 13})...),
+			builder:  NewUpdater[TestModel](db).Update(&TestModel{Id: 13}).SkipNilValue(),
 			wantSql:  "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?;",
 			wantArgs: []interface{}{int64(13), "", int8(0)},
 		},
 		{
 			name:     "not zero columns",
-			builder:  NewUpdater[TestModel](orm).Update(&TestModel{}).Set(AssignNotZeroColumns(&TestModel{Id: 13})...),
+			builder:  NewUpdater[TestModel](db).Update(&TestModel{Id: 13}).SkipZeroValue(),
 			wantSql:  "UPDATE `test_model` SET `id`=?;",
 			wantArgs: []interface{}{int64(13)},
 		},
@@ -139,15 +141,6 @@ func TestUpdater_Set(t *testing.T) {
 }
 
 func TestUpdater_SetForCombination(t *testing.T) {
-	type Person struct {
-		FirstName string
-		Age       int8
-		LastName  *sql.NullString
-	}
-	type User struct {
-		Id int64 `eorm:"auto_increment,primary_key"`
-		Person
-	}
 	u := &User{
 		Id: 12,
 		Person: Person{
@@ -156,82 +149,82 @@ func TestUpdater_SetForCombination(t *testing.T) {
 			LastName:  &sql.NullString{String: "Jerry", Valid: true},
 		},
 	}
-	orm := memoryDB()
+	db := memoryDB()
 	testCases := []CommonTestCase{
 		{
 			name:     "no set",
-			builder:  NewUpdater[User](orm).Update(u),
+			builder:  NewUpdater[User](db).Update(u),
 			wantSql:  "UPDATE `user` SET `id`=?,`first_name`=?,`age`=?,`last_name`=?;",
 			wantArgs: []interface{}{int64(12), "Tom", int8(18), &sql.NullString{String: "Jerry", Valid: true}},
 		},
 		{
 			name:     "set columns",
-			builder:  NewUpdater[User](orm).Update(u).Set(Columns("FirstName", "Age")),
+			builder:  NewUpdater[User](db).Update(u).Set(Columns("FirstName", "Age")),
 			wantSql:  "UPDATE `user` SET `first_name`=?,`age`=?;",
 			wantArgs: []interface{}{"Tom", int8(18)},
 		},
 		{
 			name:    "set invalid columns",
-			builder: NewUpdater[User](orm).Update(u).Set(Columns("FirstNameInvalid", "Age")),
-			wantErr: err.NewInvalidFieldError("FirstNameInvalid"),
+			builder: NewUpdater[User](db).Update(u).Set(Columns("FirstNameInvalid", "Age")),
+			wantErr: errs.NewInvalidFieldError("FirstNameInvalid"),
 		},
 		{
 			name:     "set c2",
-			builder:  NewUpdater[User](orm).Update(u).Set(C("FirstName"), C("Age")),
+			builder:  NewUpdater[User](db).Update(u).Set(C("FirstName"), C("Age")),
 			wantSql:  "UPDATE `user` SET `first_name`=?,`age`=?;",
 			wantArgs: []interface{}{"Tom", int8(18)},
 		},
 
 		{
 			name:    "set invalid c2",
-			builder: NewUpdater[User](orm).Update(u).Set(C("FirstNameInvalid"), C("Age")),
-			wantErr: err.NewInvalidFieldError("FirstNameInvalid"),
+			builder: NewUpdater[User](db).Update(u).Set(C("FirstNameInvalid"), C("Age")),
+			wantErr: errs.NewInvalidFieldError("FirstNameInvalid"),
 		},
 
 		{
 			name:     "set assignment",
-			builder:  NewUpdater[User](orm).Update(u).Set(C("FirstName"), Assign("Age", 30)),
+			builder:  NewUpdater[User](db).Update(u).Set(C("FirstName"), Assign("Age", 30)),
 			wantSql:  "UPDATE `user` SET `first_name`=?,`age`=?;",
 			wantArgs: []interface{}{"Tom", 30},
 		},
 		{
 			name:    "set invalid assignment",
-			builder: NewUpdater[User](orm).Update(u).Set(C("FirstName"), Assign("InvalidAge", 30)),
-			wantErr: err.NewInvalidFieldError("InvalidAge"),
+			builder: NewUpdater[User](db).Update(u).Set(C("FirstName"), Assign("InvalidAge", 30)),
+			wantErr: errs.NewInvalidFieldError("InvalidAge"),
 		},
 		{
 			name:     "set age+1",
-			builder:  NewUpdater[User](orm).Update(u).Set(C("FirstName"), Assign("Age", C("Age").Add(1))),
+			builder:  NewUpdater[User](db).Update(u).Set(C("FirstName"), Assign("Age", C("Age").Add(1))),
 			wantSql:  "UPDATE `user` SET `first_name`=?,`age`=(`age`+?);",
 			wantArgs: []interface{}{"Tom", 1},
 		},
 		{
 			name:     "set age=id+1",
-			builder:  NewUpdater[User](orm).Update(u).Set(C("FirstName"), Assign("Age", C("Id").Add(10))),
+			builder:  NewUpdater[User](db).Update(u).Set(C("FirstName"), Assign("Age", C("Id").Add(10))),
 			wantSql:  "UPDATE `user` SET `first_name`=?,`age`=(`id`+?);",
 			wantArgs: []interface{}{"Tom", 10},
 		},
 		{
 			name:     "set age=id+(age*100)",
-			builder:  NewUpdater[User](orm).Update(u).Set(C("FirstName"), Assign("Age", C("Id").Add(C("Age").Multi(100)))),
+			builder:  NewUpdater[User](db).Update(u).Set(C("FirstName"), Assign("Age", C("Id").Add(C("Age").Multi(100)))),
 			wantSql:  "UPDATE `user` SET `first_name`=?,`age`=(`id`+(`age`*?));",
 			wantArgs: []interface{}{"Tom", 100},
 		},
 		{
 			name:     "set age=(id+(age*100))*110",
-			builder:  NewUpdater[User](orm).Update(u).Set(C("FirstName"), Assign("Age", C("Id").Add(C("Age").Multi(100)).Multi(110))),
+			builder:  NewUpdater[User](db).Update(u).Set(C("FirstName"), Assign("Age", C("Id").Add(C("Age").Multi(100)).Multi(110))),
 			wantSql:  "UPDATE `user` SET `first_name`=?,`age`=((`id`+(`age`*?))*?);",
 			wantArgs: []interface{}{"Tom", 100, 110},
 		},
 		{
 			name:     "not nil columns",
-			builder:  NewUpdater[User](orm).Update(u).Set(AssignNotNilColumns(&User{Id: 13})...),
+			builder:  NewUpdater[User](db).Update(&User{Id: 13}).SkipNilValue(),
 			wantSql:  "UPDATE `user` SET `id`=?,`first_name`=?,`age`=?;",
 			wantArgs: []interface{}{int64(13), "", int8(0)},
 		},
 		{
 			name:     "not zero columns",
-			builder:  NewUpdater[User](orm).Update(u).Set(AssignNotZeroColumns(&User{Id: 13})...),
+			builder:  NewUpdater[User](db).Update(&User{Id: 13}).SkipZeroValue(),
 			wantSql:  "UPDATE `user` SET `id`=?;",
 			wantArgs: []interface{}{int64(13)},
 		},
@@ -252,7 +245,6 @@ func TestUpdater_SetForCombination(t *testing.T) {
 }
 
 func TestUpdater_Exec(t *testing.T) {
-
 	tm := &TestModel{
 		Id:        12,
 		FirstName: "Tom",
@@ -302,14 +294,14 @@ func TestUpdater_Exec(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			orm, err := openDB("mysql", mockDB)
-			defer func(db *DB) { _ = db.Close() }(orm)
+			db, err := OpenDS("mysql", single.NewDB(mockDB))
+			defer func(db *DB) { _ = db.Close() }(db)
 			if err != nil {
 				t.Fatal(err)
 			}
 			tc.mockOrder(mock)
 
-			res := tc.update(orm, t)
+			res := tc.update(db, t)
 			if res.Err() != nil {
 				assert.Equal(t, tc.wantErr, res.Err())
 				return
@@ -334,20 +326,30 @@ func TestUpdater_Exec(t *testing.T) {
 	}
 }
 
-func ExampleAssignNotNilColumns() {
+func ExampleUpdater_SkipNilValue() {
 	db := memoryDB()
-	query, _ := NewUpdater[TestModel](db).Set(AssignNotNilColumns(&TestModel{Id: 13})...).Build()
-	fmt.Println(query.string())
+	query, _ := NewUpdater[TestModel](db).Update(&TestModel{Id: 13}).SkipNilValue().Build()
+	fmt.Println(query.String())
 	// Output:
 	// SQL: UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?;
 	// Args: []interface {}{13, "", 0}
 }
 
-func ExampleAssignNotZeroColumns() {
+func ExampleUpdater_SkipZeroValue() {
 	db := memoryDB()
-	query, _ := NewUpdater[TestModel](db).Set(AssignNotZeroColumns(&TestModel{Id: 13})...).Build()
-	fmt.Println(query.string())
+	query, _ := NewUpdater[TestModel](db).Update(&TestModel{Id: 13}).SkipZeroValue().Build()
+	fmt.Println(query.String())
 	// Output:
 	// SQL: UPDATE `test_model` SET `id`=?;
 	// Args: []interface {}{13}
+}
+
+type Person struct {
+	FirstName string
+	Age       int8
+	LastName  *sql.NullString
+}
+type User struct {
+	Id int64 `eorm:"auto_increment,primary_key"`
+	Person
 }

@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,9 +19,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gotomicro/eorm/internal/errs"
-	"github.com/gotomicro/eorm/internal/model"
-	"github.com/gotomicro/eorm/internal/test"
+	"github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -48,7 +48,7 @@ func TestReflectValue_Field(t *testing.T) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})
@@ -96,7 +96,7 @@ func fuzzValueField(factory Creator) any {
 		for _, c := range cases {
 			v, err := val.Field(c.field)
 			assert.Nil(t, err)
-			assert.Equal(t, c.wantVal, v)
+			assert.Equal(t, c.wantVal, v.Interface())
 		}
 	}
 }
@@ -107,7 +107,7 @@ func BenchmarkReflectValue_Field(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		val, err := ins.Field("Int64")
 		assert.Nil(b, err)
-		assert.Equal(b, int64(13), val)
+		assert.Equal(b, int64(13), val.Interface())
 	}
 }
 

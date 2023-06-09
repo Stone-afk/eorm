@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,49 +17,40 @@ package eorm
 import (
 	"context"
 	"database/sql"
-	"errors"
 
-	"github.com/gotomicro/eorm/internal/errs"
-	"github.com/gotomicro/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/datasource"
+
+	"github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/query"
 	"github.com/valyala/bytebufferpool"
 )
-
-// QueryBuilder is used to build a query
-type QueryBuilder interface {
-	Build() (*Query, error)
-}
 
 var _ Executor = &Inserter[any]{}
 var _ Executor = &Updater[any]{}
 var _ Executor = &Deleter[any]{}
 
-// Executor is used to build a query
-type Executor interface {
-	Exec(ctx context.Context) Result
-}
+var EmptyQuery = Query{}
 
 // Query 代表一个查询
-type Query struct {
-	SQL  string
-	Args []any
-}
+type Query = query.Query
 
 // Querier 查询器，代表最基本的查询
 type Querier[T any] struct {
 	core
-	session
+	Session
 	qc *QueryContext
 }
 
 // RawQuery 创建一个 Querier 实例
 // 泛型参数 T 是目标类型。
 // 例如，如果查询 User 的数据， 那么 T 就是 User
-func RawQuery[T any](sess session, sql string, args ...any) Querier[T] {
+func RawQuery[T any](sess Session, sql string, args ...any) Querier[T] {
 	return Querier[T]{
 		core:    sess.getCore(),
-		session: sess,
+		Session: sess,
 		qc: &QueryContext{
-			q: &Query{
+			q: Query{
 				SQL:  sql,
 				Args: args,
 			},
@@ -68,10 +59,10 @@ func RawQuery[T any](sess session, sql string, args ...any) Querier[T] {
 	}
 }
 
-func newQuerier[T any](sess session, q *Query, meta *model.TableMeta, typ string) Querier[T] {
+func newQuerier[T any](sess Session, q Query, meta *model.TableMeta, typ string) Querier[T] {
 	return Querier[T]{
 		core:    sess.getCore(),
-		session: sess,
+		Session: sess,
 		qc: &QueryContext{
 			q:    q,
 			meta: meta,
@@ -83,7 +74,7 @@ func newQuerier[T any](sess session, q *Query, meta *model.TableMeta, typ string
 // Exec 执行 SQL
 func (q Querier[T]) Exec(ctx context.Context) Result {
 	var handler HandleFunc = func(ctx context.Context, qc *QueryContext) *QueryResult {
-		res, err := q.session.execContext(ctx, qc.q.SQL, qc.q.Args...)
+		res, err := q.Session.execContext(ctx, datasource.Query(qc.q))
 		return &QueryResult{Result: res, Err: err}
 	}
 
@@ -103,7 +94,7 @@ func (q Querier[T]) Exec(ctx context.Context) Result {
 // 注意在不同的数据库里面，排序可能会不同
 // 在没有查找到数据的情况下，会返回 ErrNoRows
 func (q Querier[T]) Get(ctx context.Context) (*T, error) {
-	res := get[T](ctx, q.session, q.core, q.qc)
+	res := get[T](ctx, q.Session, q.core, q.qc)
 	if res.Err != nil {
 		return nil, res.Err
 	}
@@ -114,24 +105,24 @@ type builder struct {
 	core
 	// 使用 bytebufferpool 以减少内存分配
 	// 每次调用 Get 之后不要忘记再调用 Put
-	buffer  *bytebufferpool.ByteBuffer
-	meta    *model.TableMeta
-	args    []interface{}
-	aliases map[string]struct{}
+	buffer *bytebufferpool.ByteBuffer
+	meta   *model.TableMeta
+	args   []interface{}
+	// aliases map[string]struct{}
 }
 
 func (b *builder) quote(val string) {
-	_ = b.buffer.WriteByte(b.dialect.Quote)
-	_, _ = b.buffer.WriteString(val)
-	_ = b.buffer.WriteByte(b.dialect.Quote)
+	b.writeByte(b.dialect.Quote)
+	b.writeString(val)
+	b.writeByte(b.dialect.Quote)
 }
 
 func (b *builder) space() {
-	_ = b.buffer.WriteByte(' ')
+	b.writeByte(' ')
 }
 
 func (b *builder) point() {
-	_ = b.buffer.WriteByte('.')
+	b.writeByte('.')
 }
 
 func (b *builder) writeString(val string) {
@@ -143,11 +134,11 @@ func (b *builder) writeByte(c byte) {
 }
 
 func (b *builder) end() {
-	_ = b.buffer.WriteByte(';')
+	b.writeByte(';')
 }
 
 func (b *builder) comma() {
-	_ = b.buffer.WriteByte(',')
+	b.writeByte(',')
 }
 
 func (b *builder) parameter(arg interface{}) {
@@ -155,20 +146,21 @@ func (b *builder) parameter(arg interface{}) {
 		// TODO 4 may be not a good number
 		b.args = make([]interface{}, 0, 4)
 	}
-	_ = b.buffer.WriteByte('?')
+	b.writeByte('?')
 	b.args = append(b.args, arg)
 }
 
 func (b *builder) buildExpr(expr Expr) error {
 	switch e := expr.(type) {
+	case nil:
 	case RawExpr:
 		b.buildRawExpr(e)
 	case Column:
-		_, ok := b.aliases[e.name]
-		if ok {
-			b.quote(e.name)
-			return nil
-		}
+		// _, ok := b.aliases[e.name]
+		// if ok {
+		// 	b.quote(e.name)
+		// 	return nil
+		// }
 		return b.buildColumn(e)
 	case Aggregate:
 		if err := b.buildHavingAggregate(e); err != nil {
@@ -188,9 +180,14 @@ func (b *builder) buildExpr(expr Expr) error {
 		if err := b.buildIns(e); err != nil {
 			return err
 		}
-	case nil:
+	case Subquery:
+		return b.buildSubquery(e, false)
+	case SubqueryExpr:
+		b.writeString(e.pred)
+		b.writeByte(' ')
+		return b.buildSubquery(e.s, false)
 	default:
-		return errors.New("unsupported expr")
+		return errs.NewErrUnsupportedExpressionType()
 	}
 	return nil
 }
@@ -204,18 +201,18 @@ func (b *builder) buildPredicates(predicates []Predicate) error {
 }
 
 func (b *builder) buildHavingAggregate(aggregate Aggregate) error {
-	_, _ = b.buffer.WriteString(aggregate.fn)
+	b.writeString(aggregate.fn)
 
-	_ = b.buffer.WriteByte('(')
+	b.writeByte('(')
 	if aggregate.distinct {
-		_, _ = b.buffer.WriteString("DISTINCT ")
+		b.writeString("DISTINCT ")
 	}
 	cMeta, ok := b.meta.FieldMap[aggregate.arg]
 	if !ok {
 		return errs.NewInvalidFieldError(aggregate.arg)
 	}
 	b.quote(cMeta.ColumnName)
-	_ = b.buffer.WriteByte(')')
+	b.writeByte(')')
 	return nil
 }
 
@@ -224,29 +221,29 @@ func (b *builder) buildBinaryExpr(e binaryExpr) error {
 	if err != nil {
 		return err
 	}
-	_, _ = b.buffer.WriteString(e.op.text)
+	b.writeString(e.op.Text)
 	return b.buildSubExpr(e.right)
 }
 
 func (b *builder) buildRawExpr(e RawExpr) {
-	_, _ = b.buffer.WriteString(e.raw)
+	b.writeString(e.raw)
 	b.args = append(b.args, e.args...)
 }
 
 func (b *builder) buildSubExpr(subExpr Expr) error {
 	switch r := subExpr.(type) {
 	case MathExpr:
-		_ = b.buffer.WriteByte('(')
+		b.writeByte('(')
 		if err := b.buildBinaryExpr(binaryExpr(r)); err != nil {
 			return err
 		}
-		_ = b.buffer.WriteByte(')')
+		b.writeByte(')')
 	case Predicate:
-		_ = b.buffer.WriteByte('(')
+		b.writeByte('(')
 		if err := b.buildBinaryExpr(binaryExpr(r)); err != nil {
 			return err
 		}
-		_ = b.buffer.WriteByte(')')
+		b.writeByte(')')
 	default:
 		if err := b.buildExpr(r); err != nil {
 			return err
@@ -256,22 +253,22 @@ func (b *builder) buildSubExpr(subExpr Expr) error {
 }
 
 func (b *builder) buildIns(is values) error {
-	_ = b.buffer.WriteByte('(')
+	b.writeByte('(')
 	for idx, inVal := range is.data {
 		if idx > 0 {
-			_ = b.buffer.WriteByte(',')
+			b.writeByte(',')
 		}
 
 		b.args = append(b.args, inVal)
-		_ = b.buffer.WriteByte('?')
+		b.writeByte('?')
 
 	}
-	_ = b.buffer.WriteByte(')')
+	b.writeByte(')')
 	return nil
 }
 
 func (q Querier[T]) GetMulti(ctx context.Context) ([]*T, error) {
-	res := getMulti[T](ctx, q.session, q.core, q.qc)
+	res := getMulti[T](ctx, q.Session, q.core, q.qc)
 	if res.Err != nil {
 		return nil, res.Err
 	}
@@ -288,6 +285,7 @@ func (b *builder) buildColumn(c Column) error {
 		}
 		b.quote(fd.ColumnName)
 		if c.alias != "" {
+			// b.aliases[c.alias] = struct{}{}
 			b.writeString(" AS ")
 			b.quote(c.alias)
 		}
@@ -302,7 +300,7 @@ func (b *builder) buildColumn(c Column) error {
 		}
 		if table.alias != "" {
 			b.quote(table.alias)
-			b.writeByte('.')
+			b.point()
 		}
 		b.quote(fd.ColumnName)
 		if c.alias != "" {
@@ -314,4 +312,33 @@ func (b *builder) buildColumn(c Column) error {
 	}
 	return nil
 	}
+}
+
+// buildSubquery 構建子查詢 SQL，
+// useAlias 決定是否顯示別名，即使有別名
+func (b *builder) buildSubquery(sub Subquery, useAlias bool) error {
+	q, err := sub.q.Build()
+	if err != nil {
+		return err
+	}
+	b.writeByte('(')
+	// 拿掉最後 ';'
+	b.writeString(q.SQL[:len(q.SQL)-1])
+	// 因為有 build() ，所以理應 args 也需要跟 SQL 一起處理
+	if len(q.Args) > 0 {
+		b.addArgs(q.Args...)
+	}
+	b.writeByte(')')
+	if useAlias {
+		b.writeString(" AS ")
+		b.quote(sub.getAlias())
+	}
+	return nil
+}
+
+func (b *builder) addArgs(args ...any) {
+	if b.args == nil {
+		b.args = make([]any, 0, 8)
+	}
+	b.args = append(b.args, args...)
 }

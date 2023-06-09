@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,9 +22,9 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/gotomicro/eorm/internal/errs"
-	"github.com/gotomicro/eorm/internal/model"
-	"github.com/gotomicro/eorm/internal/test"
+	"github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -172,7 +172,7 @@ func testSetColumn(t *testing.T, creator Creator) {
 	})
 
 	type BaseEntity struct {
-		Id         int64 `eorm:"auto_increment,primary_key"`
+		Id         int64 `eorm:"primary_key"`
 		CreateTime uint64
 	}
 	type CombinedUser struct {
@@ -229,7 +229,7 @@ func testValueField(t *testing.T, creator Creator) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})
@@ -244,7 +244,7 @@ func testValueField(t *testing.T, creator Creator) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})
@@ -276,13 +276,13 @@ func testValueField(t *testing.T, creator Creator) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})
 
 	type BaseEntity struct {
-		Id         int64 `eorm:"auto_increment,primary_key"`
+		Id         int64 `eorm:"primary_key"`
 		CreateTime uint64
 	}
 	type CombinedUser struct {
@@ -323,7 +323,7 @@ func testValueField(t *testing.T, creator Creator) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})
@@ -529,14 +529,14 @@ func BenchmarkUnsafeValue_Field(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			val, err := ins.Field("Int64")
 			assert.Nil(b, err)
-			assert.Equal(b, int64(13), val)
+			assert.Equal(b, int64(13), val.Interface())
 		}
 	})
 	b.Run("holder", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			val, err := ins.Field("NullStringPtr")
 			assert.Nil(b, err)
-			assert.Equal(b, &sql.NullString{}, val)
+			assert.Equal(b, &sql.NullString{}, val.Interface())
 		}
 	})
 }

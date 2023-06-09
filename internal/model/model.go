@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,21 +15,16 @@
 package model
 
 import (
-	"database/sql"
-	"database/sql/driver"
 	"reflect"
 	"strings"
 	"sync"
 
-	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/sharding"
+
+	"github.com/ecodeclub/eorm/internal/errs"
 
 	// nolint
 	"unicode"
-)
-
-var (
-	scannerType      = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
-	driverValuerType = reflect.TypeOf((*driver.Valuer)(nil)).Elem()
 )
 
 // TableMeta represents data model, or a table
@@ -41,15 +36,16 @@ type TableMeta struct {
 	// ColumnMap 是列名到列元数据的映射
 	ColumnMap map[string]*ColumnMeta
 	Typ       reflect.Type
+
+	ShardingAlgorithm sharding.Algorithm
 }
 
 // ColumnMeta represents model's field, or column
 type ColumnMeta struct {
-	ColumnName      string
-	FieldName       string
-	Typ             reflect.Type
-	IsPrimaryKey    bool
-	IsAutoIncrement bool
+	ColumnName   string
+	FieldName    string
+	Typ          reflect.Type
+	IsPrimaryKey bool
 	// Offset 是字段偏移量。需要注意的是，这里的字段偏移量是相对于整个结构体的偏移量
 	// 例如在组合的情况下，
 	// type A struct {
@@ -61,15 +57,18 @@ type ColumnMeta struct {
 	// }
 	// age 的偏移量是相对于 A 的起始地址的偏移量
 	Offset uintptr
-	// IsHolderType 用于表达是否是 Holder 的类型
-	// 所谓的 Holder，就是指同时实现了 sql.Scanner 和 driver.Valuer 两个接口的类型
-	IsHolderType bool
 	// FieldIndexes 用于表达从最外层结构体找到当前ColumnMeta对应的Field所需要的索引集
 	FieldIndexes []int
 }
 
 // TableMetaOption represents options of TableMeta, this options will cover default cover.
 type TableMetaOption func(meta *TableMeta)
+
+func WithTableShardingAlgorithm(algorithm sharding.Algorithm) TableMetaOption {
+	return func(meta *TableMeta) {
+		meta.ShardingAlgorithm = algorithm
+	}
+}
 
 // MetaRegistry stores table metadata
 type MetaRegistry interface {
@@ -130,6 +129,7 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (
 	for _, o := range opts {
 		o(tableMeta)
 	}
+
 	t.metas.Store(rtype, tableMeta)
 	return tableMeta, nil
 
@@ -142,13 +142,11 @@ func (t *tagMetaRegistry) parseFields(v reflect.Type, fieldIndexes []int,
 	for i := 0; i < lens; i++ {
 		structField := v.Field(i)
 		tag := structField.Tag.Get("eorm")
-		var isKey, isAuto, isIgnore bool
+		var isKey, isIgnore bool
 		for _, t := range strings.Split(tag, ",") {
 			switch t {
 			case "primary_key":
 				isKey = true
-			case "auto_increment":
-				isAuto = true
 			case "-":
 				isIgnore = true
 			}
@@ -177,14 +175,12 @@ func (t *tagMetaRegistry) parseFields(v reflect.Type, fieldIndexes []int,
 		}
 
 		columnMeta := &ColumnMeta{
-			ColumnName:      underscoreName(structField.Name),
-			FieldName:       structField.Name,
-			Typ:             structField.Type,
-			IsAutoIncrement: isAuto,
-			IsPrimaryKey:    isKey,
-			Offset:          structField.Offset + pOffset,
-			IsHolderType:    structField.Type.AssignableTo(scannerType) && structField.Type.AssignableTo(driverValuerType),
-			FieldIndexes:    append(fieldIndexes, i),
+			ColumnName:   underscoreName(structField.Name),
+			FieldName:    structField.Name,
+			Typ:          structField.Type,
+			IsPrimaryKey: isKey,
+			Offset:       structField.Offset + pOffset,
+			FieldIndexes: append(fieldIndexes, i),
 		}
 		*columnMetas = append(*columnMetas, columnMeta)
 		fieldMap[columnMeta.FieldName] = columnMeta

@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -174,7 +174,7 @@ type CommonTestCase struct {
 func ExampleNot() {
 	db := memoryDB()
 	query, _ := NewSelector[TestModel](db).Select(Columns("Id")).Where(Not(C("Id").EQ(18))).Build()
-	fmt.Println(query.string())
+	fmt.Println(query.String())
 	// Output:
 	// SQL: SELECT `id` FROM `test_model` WHERE NOT (`id`=?);
 	// Args: []interface {}{18}
@@ -183,7 +183,7 @@ func ExampleNot() {
 func ExamplePredicate_And() {
 	db := memoryDB()
 	query, _ := NewSelector[TestModel](db).Select(Columns("Id")).Where(C("Id").EQ(18).And(C("Age").GT(100))).Build()
-	fmt.Println(query.string())
+	fmt.Println(query.String())
 	// Output:
 	// SQL: SELECT `id` FROM `test_model` WHERE (`id`=?) AND (`age`>?);
 	// Args: []interface {}{18, 100}
@@ -192,7 +192,7 @@ func ExamplePredicate_And() {
 func ExamplePredicate_Or() {
 	db := memoryDB()
 	query, _ := NewSelector[TestModel](db).Select(Columns("Id")).Where(C("Id").EQ(18).Or(C("Age").GT(100))).Build()
-	fmt.Println(query.string())
+	fmt.Println(query.String())
 	// Output:
 	// SQL: SELECT `id` FROM `test_model` WHERE (`id`=?) OR (`age`>?);
 	// Args: []interface {}{18, 100}

@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/errs"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -39,12 +39,11 @@ func TestTagMetaRegistry(t *testing.T) {
 				TableName: "test_model",
 				Columns: []*ColumnMeta{
 					{
-						ColumnName:      "id",
-						FieldName:       "Id",
-						Typ:             reflect.TypeOf(int64(0)),
-						IsPrimaryKey:    true,
-						IsAutoIncrement: true,
-						FieldIndexes:    []int{0},
+						ColumnName:   "id",
+						FieldName:    "Id",
+						Typ:          reflect.TypeOf(int64(0)),
+						IsPrimaryKey: true,
+						FieldIndexes: []int{0},
 					},
 					{
 						ColumnName:   "first_name",
@@ -101,30 +100,27 @@ func TestTagMetaRegistry_Combination(t *testing.T) {
 				TableName: "test_combined_model",
 				Columns: []*ColumnMeta{
 					{
-						ColumnName:      "create_time",
-						FieldName:       "CreateTime",
-						Typ:             reflect.TypeOf(uint64(0)),
-						IsPrimaryKey:    false,
-						IsAutoIncrement: false,
-						Offset:          0,
-						FieldIndexes:    []int{0, 0},
+						ColumnName:   "create_time",
+						FieldName:    "CreateTime",
+						Typ:          reflect.TypeOf(uint64(0)),
+						IsPrimaryKey: false,
+						Offset:       0,
+						FieldIndexes: []int{0, 0},
 					}, {
-						ColumnName:      "update_time",
-						FieldName:       "UpdateTime",
-						Typ:             reflect.TypeOf(uint64(0)),
-						IsPrimaryKey:    false,
-						IsAutoIncrement: false,
-						Offset:          8,
-						FieldIndexes:    []int{0, 1},
+						ColumnName:   "update_time",
+						FieldName:    "UpdateTime",
+						Typ:          reflect.TypeOf(uint64(0)),
+						IsPrimaryKey: false,
+						Offset:       8,
+						FieldIndexes: []int{0, 1},
 					},
 					{
-						ColumnName:      "id",
-						FieldName:       "Id",
-						Typ:             reflect.TypeOf(int64(0)),
-						IsPrimaryKey:    true,
-						IsAutoIncrement: true,
-						Offset:          16,
-						FieldIndexes:    []int{1},
+						ColumnName:   "id",
+						FieldName:    "Id",
+						Typ:          reflect.TypeOf(int64(0)),
+						IsPrimaryKey: true,
+						Offset:       16,
+						FieldIndexes: []int{1},
 					},
 					{
 						ColumnName:   "first_name",
@@ -165,13 +161,12 @@ func TestTagMetaRegistry_Combination(t *testing.T) {
 				TableName: "test_combined_model_ignore",
 				Columns: []*ColumnMeta{
 					{
-						ColumnName:      "id",
-						FieldName:       "Id",
-						Typ:             reflect.TypeOf(int64(0)),
-						IsPrimaryKey:    true,
-						IsAutoIncrement: true,
-						Offset:          16,
-						FieldIndexes:    []int{1},
+						ColumnName:   "id",
+						FieldName:    "Id",
+						Typ:          reflect.TypeOf(int64(0)),
+						IsPrimaryKey: true,
+						Offset:       16,
+						FieldIndexes: []int{1},
 					},
 					{
 						ColumnName:   "first_name",
@@ -206,31 +201,28 @@ func TestTagMetaRegistry_Combination(t *testing.T) {
 				TableName: "test_combined_model_multi",
 				Columns: []*ColumnMeta{
 					{
-						ColumnName:      "create_time",
-						FieldName:       "CreateTime",
-						Typ:             reflect.TypeOf(uint64(0)),
-						IsPrimaryKey:    false,
-						IsAutoIncrement: false,
-						Offset:          0,
-						FieldIndexes:    []int{0, 0},
+						ColumnName:   "create_time",
+						FieldName:    "CreateTime",
+						Typ:          reflect.TypeOf(uint64(0)),
+						IsPrimaryKey: false,
+						Offset:       0,
+						FieldIndexes: []int{0, 0},
 					},
 					{
-						ColumnName:      "update_time",
-						FieldName:       "UpdateTime",
-						Typ:             reflect.TypeOf(uint64(0)),
-						IsPrimaryKey:    false,
-						IsAutoIncrement: false,
-						Offset:          8,
-						FieldIndexes:    []int{0, 1},
+						ColumnName:   "update_time",
+						FieldName:    "UpdateTime",
+						Typ:          reflect.TypeOf(uint64(0)),
+						IsPrimaryKey: false,
+						Offset:       8,
+						FieldIndexes: []int{0, 1},
 					},
 					{
-						ColumnName:      "id",
-						FieldName:       "Id",
-						Typ:             reflect.TypeOf(int64(0)),
-						IsPrimaryKey:    true,
-						IsAutoIncrement: true,
-						Offset:          16,
-						FieldIndexes:    []int{1},
+						ColumnName:   "id",
+						FieldName:    "Id",
+						Typ:          reflect.TypeOf(int64(0)),
+						IsPrimaryKey: true,
+						Offset:       16,
+						FieldIndexes: []int{1},
 					},
 					{
 						ColumnName:   "first_name",
@@ -279,30 +271,27 @@ func TestTagMetaRegistry_Combination(t *testing.T) {
 				TableName: "test_combined_model_nested",
 				Columns: []*ColumnMeta{
 					{
-						ColumnName:      "create_time",
-						FieldName:       "CreateTime",
-						Typ:             reflect.TypeOf(uint64(0)),
-						IsPrimaryKey:    false,
-						IsAutoIncrement: false,
-						Offset:          0,
-						FieldIndexes:    []int{0, 0, 0},
+						ColumnName:   "create_time",
+						FieldName:    "CreateTime",
+						Typ:          reflect.TypeOf(uint64(0)),
+						IsPrimaryKey: false,
+						Offset:       0,
+						FieldIndexes: []int{0, 0, 0},
 					}, {
-						ColumnName:      "update_time",
-						FieldName:       "UpdateTime",
-						Typ:             reflect.TypeOf(uint64(0)),
-						IsPrimaryKey:    false,
-						IsAutoIncrement: false,
-						Offset:          8,
-						FieldIndexes:    []int{0, 0, 1},
+						ColumnName:   "update_time",
+						FieldName:    "UpdateTime",
+						Typ:          reflect.TypeOf(uint64(0)),
+						IsPrimaryKey: false,
+						Offset:       8,
+						FieldIndexes: []int{0, 0, 1},
 					},
 					{
-						ColumnName:      "id",
-						FieldName:       "Id",
-						Typ:             reflect.TypeOf(int64(0)),
-						IsPrimaryKey:    true,
-						IsAutoIncrement: true,
-						Offset:          16,
-						FieldIndexes:    []int{0, 1},
+						ColumnName:   "id",
+						FieldName:    "Id",
+						Typ:          reflect.TypeOf(int64(0)),
+						IsPrimaryKey: true,
+						Offset:       16,
+						FieldIndexes: []int{0, 1},
 					},
 					{
 						ColumnName:   "first_name",
@@ -424,6 +413,50 @@ case3：
 	column names：%s
 `, meta.TableName, meta.Columns[0].ColumnName)
 
+	//	// case4 use IgnoreFieldOption to ignore field and sharding key
+	//	tim = &TestIgnoreModel{}
+	//	registry = &tagMetaRegistry{}
+	//	meta, _ = registry.Register(tim, IgnoreFieldsOption("FirstName"),
+	//		WithShardingKey("Id"))
+	//	fmt.Printf(`
+	//case4：
+	//	table name：%s
+	//	column names：%s
+	//	sharding key name：%s
+	//`, meta.TableName, meta.Columns[0].ColumnName, meta.ShardingKey)
+	//
+	//	// case5 use IgnoreFieldOption to ignore field and db ShardingFunc
+	//	tim = &TestIgnoreModel{}
+	//	registry = &tagMetaRegistry{}
+	//	meta, _ = registry.Register(tim, IgnoreFieldsOption("FirstName"),
+	//		WithDBShardingFunc(func(skVal any) (string, error) {
+	//			db := skVal.(int) / 100
+	//			return fmt.Sprintf("order_db_%d", db), nil
+	//		}))
+	//	dbName, _ := meta.DBShardingFunc(123)
+	//	fmt.Printf(`
+	//case5：
+	//	table name：%s
+	//	column names：%s
+	//	db sharding name：%s
+	//`, meta.TableName, meta.Columns[0].ColumnName, dbName)
+	//
+	//	// case6 use IgnoreFieldOption to ignore field and sharding key and table ShardingFunc
+	//	tim = &TestIgnoreModel{}
+	//	registry = &tagMetaRegistry{}
+	//	meta, _ = registry.Register(tim, IgnoreFieldsOption("FirstName"),
+	//		WithTableShardingFunc(func(skVal any) (string, error) {
+	//			tbl := skVal.(int) % 10
+	//			return fmt.Sprintf("order_tab_%d", tbl), nil
+	//		}))
+	//	tbName, _ := meta.TableShardingFunc(123)
+	//	fmt.Printf(`
+	//case6：
+	//	table name：%s
+	//	column names：%s
+	//	table sharding name：%s
+	//`, meta.TableName, meta.Columns[0].ColumnName, tbName)
+
 	// Output:
 	// case1：
 	// 	table name：test_model
@@ -434,8 +467,8 @@ case3：
 	// 	column names：first_name,last_name
 	//
 	// case3：
-	// 	table name：test_ignore_model
-	// 	column names：last_name
+	//	table name：test_ignore_model
+	//	column names：last_name
 }
 
 type tableMetaBuilder struct {
@@ -463,7 +496,7 @@ func (t tableMetaBuilder) build() *TableMeta {
 }
 
 type TestModel struct {
-	Id        int64 `eorm:"auto_increment,primary_key"`
+	Id        int64 `eorm:"primary_key"`
 	FirstName string
 	Age       int8
 	LastName  *string
@@ -475,7 +508,7 @@ type BaseEntity struct {
 }
 
 type BaseEntity2 struct {
-	Id         int64 `eorm:"auto_increment,primary_key"`
+	Id         int64 `eorm:"primary_key"`
 	CreateTime uint64
 	UpdateTime uint64
 }
@@ -487,7 +520,7 @@ type Contact struct {
 
 type TestCombinedModel struct {
 	BaseEntity
-	Id        int64 `eorm:"auto_increment,primary_key"`
+	Id        int64 `eorm:"primary_key"`
 	FirstName string
 	Age       int8
 	LastName  *string
@@ -495,7 +528,7 @@ type TestCombinedModel struct {
 
 type TestCombinedModelPtr struct {
 	*BaseEntity
-	Id        int64 `eorm:"auto_increment,primary_key"`
+	Id        int64 `eorm:"primary_key"`
 	FirstName string
 	Age       int8
 	LastName  *string
@@ -503,7 +536,7 @@ type TestCombinedModelPtr struct {
 
 type TestCombinedModelIgnore struct {
 	BaseEntity `eorm:"-"`
-	Id         int64 `eorm:"auto_increment,primary_key"`
+	Id         int64 `eorm:"primary_key"`
 	FirstName  string
 	Age        int8
 	LastName   *string
@@ -511,7 +544,7 @@ type TestCombinedModelIgnore struct {
 
 type TestCombinedModelMulti struct {
 	BaseEntity
-	Id        int64 `eorm:"auto_increment,primary_key"`
+	Id        int64 `eorm:"primary_key"`
 	FirstName string
 	Age       int8
 	LastName  *string
@@ -524,7 +557,7 @@ type TestCombinedModelNested struct {
 
 type TestCombinedModelConflict struct {
 	BaseEntity2
-	Id        int64 `eorm:"auto_increment,primary_key"`
+	Id        int64 `eorm:"primary_key"`
 	FirstName string
 	Age       int8
 	LastName  *string

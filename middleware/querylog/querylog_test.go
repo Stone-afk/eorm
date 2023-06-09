@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gotomicro/eorm"
+	"github.com/ecodeclub/eorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 )
@@ -97,16 +97,16 @@ func TestMiddlewareBuilder_Build(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mdls := tc.mdls
 			mdls = append(mdls, tc.builder.Build())
-			db, err := eorm.Open("sqlite3",
-				"file:test.db?cache=shared&mode=memory", eorm.DBWithMiddlewares(
-					mdls...))
+			orm, err := eorm.Open("sqlite3",
+				"file:test.db?cache=shared&mode=memory",
+				eorm.DBWithMiddlewares(mdls...))
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer func() {
-				_ = db.Close()
+				_ = orm.Close()
 			}()
-			_, err = eorm.NewSelector[TestModel](db).Get(context.Background())
+			_, err = eorm.NewSelector[TestModel](orm).Get(context.Background())
 			if err.Error() == "no such table: test_model" {
 				return
 			}
@@ -126,7 +126,7 @@ type testMiddlewareBuilder struct {
 }
 
 type TestModel struct {
-	Id        int64 `eorm:"auto_increment,primary_key"`
+	Id        int64 `eorm:"primary_key"`
 	FirstName string
 	Age       int8
 	LastName  *sql.NullString

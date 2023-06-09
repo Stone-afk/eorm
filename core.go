@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,24 +18,27 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/gotomicro/eorm/internal/dialect"
-	"github.com/gotomicro/eorm/internal/errs"
-	"github.com/gotomicro/eorm/internal/model"
-	"github.com/gotomicro/eorm/internal/valuer"
+	"github.com/ecodeclub/eorm/internal/dialect"
+	"github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/valuer"
 )
 
 type core struct {
-	ms           []Middleware
 	metaRegistry model.MetaRegistry
 	dialect      dialect.Dialect
-	valCreator   valuer.BasicTypeCreator
+	valCreator   valuer.PrimitiveCreator
+	ms           []Middleware
 }
 
-func getHandler[T any](ctx context.Context, sess session, c core, qc *QueryContext) *QueryResult {
-	rows, err := sess.queryContext(ctx, qc.q.SQL, qc.q.Args...)
+func getHandler[T any](ctx context.Context, sess Session, c core, qc *QueryContext) *QueryResult {
+	rows, err := sess.queryContext(ctx, qc.q)
 	if err != nil {
 		return &QueryResult{Err: err}
 	}
+	defer func() {
+		_ = rows.Close()
+	}()
 	if !rows.Next() {
 		return &QueryResult{Err: errs.ErrNoRows}
 	}
@@ -49,14 +52,15 @@ func getHandler[T any](ctx context.Context, sess session, c core, qc *QueryConte
 		meta, _ = c.metaRegistry.Get(tp)
 	}
 
-	val := c.valCreator.NewBasicTypeValue(tp, meta)
+	val := c.valCreator.NewPrimitiveValue(tp, meta)
 	if err = val.SetColumns(rows); err != nil {
 		return &QueryResult{Err: err}
 	}
+
 	return &QueryResult{Result: tp}
 }
 
-func get[T any](ctx context.Context, sess session, core core, qc *QueryContext) *QueryResult {
+func get[T any](ctx context.Context, sess Session, core core, qc *QueryContext) *QueryResult {
 	var handler HandleFunc = func(ctx context.Context, queryContext *QueryContext) *QueryResult {
 		return getHandler[T](ctx, sess, core, queryContext)
 	}
@@ -67,11 +71,14 @@ func get[T any](ctx context.Context, sess session, core core, qc *QueryContext) 
 	return handler(ctx, qc)
 }
 
-func getMultiHandler[T any](ctx context.Context, sess session, c core, qc *QueryContext) *QueryResult {
-	rows, err := sess.queryContext(ctx, qc.q.SQL, qc.q.Args...)
+func getMultiHandler[T any](ctx context.Context, sess Session, c core, qc *QueryContext) *QueryResult {
+	rows, err := sess.queryContext(ctx, qc.q)
 	if err != nil {
 		return &QueryResult{Err: err}
 	}
+	defer func() {
+		_ = rows.Close()
+	}()
 	res := make([]*T, 0, 16)
 	meta := qc.meta
 	if meta == nil {
@@ -85,16 +92,17 @@ func getMultiHandler[T any](ctx context.Context, sess session, c core, qc *Query
 	}
 	for rows.Next() {
 		tp := new(T)
-		val := c.valCreator.NewBasicTypeValue(tp, meta)
+		val := c.valCreator.NewPrimitiveValue(tp, meta)
 		if err = val.SetColumns(rows); err != nil {
 			return &QueryResult{Err: err}
 		}
 		res = append(res, tp)
 	}
+
 	return &QueryResult{Result: res}
 }
 
-func getMulti[T any](ctx context.Context, sess session, core core, qc *QueryContext) *QueryResult {
+func getMulti[T any](ctx context.Context, sess Session, core core, qc *QueryContext) *QueryResult {
 	var handler HandleFunc = func(ctx context.Context, queryContext *QueryContext) *QueryResult {
 		return getMultiHandler[T](ctx, sess, core, queryContext)
 	}

@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,8 +28,23 @@ var (
 	ErrTooManyColumns = errors.New("eorm: 过多列")
 
 	// ErrCombinationIsNotStruct 不支持的组合类型，eorm 只支持结构体组合
-	ErrCombinationIsNotStruct = errors.New("eorm: 不支持的组合类型，eorm 只支持结构体组合")
+	ErrCombinationIsNotStruct     = errors.New("eorm: 不支持的组合类型，eorm 只支持结构体组合")
+	ErrMissingShardingKey         = errors.New("eorm: sharding key 未设置")
+	ErrOnlyResultOneQuery         = errors.New("eorm: 只能生成一个 SQL")
+	ErrUnsupportedTooComplexQuery = errors.New("eorm: 暂未支持太复杂的查询")
+	ErrSlaveNotFound              = errors.New("eorm: slave不存在")
+	ErrNotFoundTargetDataSource   = errors.New("eorm: 未发现目标 data source")
+	ErrNotFoundTargetDB           = errors.New("eorm: 未发现目标 DB")
+	ErrNotGenShardingQuery        = errors.New("eorm: 未生成 sharding query")
+	ErrNotCompleteTxBeginner      = errors.New("eorm: 未实现 TxBeginner 接口")
+	ErrInsertShardingKeyNotFound  = errors.New("eorm: insert语句中未包含sharding key")
+	ErrInsertFindingDst           = errors.New("eorm: 一行数据只能插入一个表")
+	ErrUnsupportedAssignment      = errors.New("eorm: 不支持的 assignment")
 )
+
+func NewErrUpdateShardingKeyUnsupported(field string) error {
+	return fmt.Errorf("eorm: ShardingKey `%s` 不支持更新", field)
+}
 
 func NewFieldConflictError(field string) error {
 	return fmt.Errorf("eorm: `%s`列冲突", field)
@@ -63,6 +78,22 @@ func NewUnsupportedTableReferenceError(table any) error {
 	return fmt.Errorf("eorm: 不支持的TableReference类型 %v", table)
 }
 
+func NewErrUnsupportedExpressionType() error {
+	return fmt.Errorf("eorm: 不支持 Expression")
+}
+
 func NewMustSpecifyColumnsError() error {
 	return fmt.Errorf("eorm: 复合查询如 JOIN 查询、子查询必须指定要查找的列，即指定 SELECT xxx 部分")
+}
+
+func NewUnsupportedOperatorError(op string) error {
+	return fmt.Errorf("eorm: 不支持的 operator %v", op)
+}
+
+func NewInvalidDSNError(dsn string) error {
+	return fmt.Errorf("eorm: 不正确的 DSN %s", dsn)
+}
+
+func NewFailedToGetSlavesFromDNS(err error) error {
+	return fmt.Errorf("eorm: 从DNS中解析从库失败 %w", err)
 }

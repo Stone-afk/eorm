@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,33 +17,29 @@ package eorm
 import (
 	"context"
 
-	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/valyala/bytebufferpool"
 )
 
-// Selector represents a select query
+var _ QueryBuilder = &Selector[any]{}
+
+// Selector select 构造器
 type Selector[T any] struct {
-	builder
-	session
-	columns  []Selectable
-	table    TableReference
-	where    []Predicate
-	distinct bool
-	having   []Predicate
-	groupBy  []string
-	orderBy  []OrderBy
-	offset   int
-	limit    int
+	Session
+	selectorBuilder
+	table TableReference
 }
 
 // NewSelector 创建一个 Selector
-func NewSelector[T any](sess session) *Selector[T] {
+func NewSelector[T any](sess Session) *Selector[T] {
 	return &Selector[T]{
-		builder: builder{
-			core:   sess.getCore(),
-			buffer: bytebufferpool.Get(),
+		selectorBuilder: selectorBuilder{
+			builder: builder{
+				core:   sess.getCore(),
+				buffer: bytebufferpool.Get(),
+			},
 		},
-		session: sess,
+		Session: sess,
 	}
 }
 
@@ -59,12 +55,12 @@ func (s *Selector[T]) tableOf() any {
 }
 
 // Build returns Select Query
-func (s *Selector[T]) Build() (*Query, error) {
+func (s *Selector[T]) Build() (Query, error) {
 	defer bytebufferpool.Put(s.buffer)
 	var err error
 	s.meta, err = s.metaRegistry.Get(s.tableOf())
 	if err != nil {
-		return nil, err
+		return EmptyQuery, err
 	}
 	s.writeString("SELECT ")
 	if s.distinct {
@@ -74,28 +70,28 @@ func (s *Selector[T]) Build() (*Query, error) {
 		switch s.table.(type) {
 		case Table, nil:
 			if err = s.buildAllColumns(); err != nil {
-				return nil, err
+				return EmptyQuery, err
 			}
 		default:
-			return nil, errs.NewMustSpecifyColumnsError()
+			return EmptyQuery, errs.NewMustSpecifyColumnsError()
 		}
 	} else {
 		err = s.buildSelectedList()
 		if err != nil {
-			return nil, err
+			return EmptyQuery, err
 		}
 	}
 	s.writeString(" FROM ")
 
 	if err = s.buildTable(s.table); err != nil {
-		return nil, err
+		return EmptyQuery, err
 	}
 
 	if len(s.where) > 0 {
 		s.writeString(" WHERE ")
 		err = s.buildPredicates(s.where)
 		if err != nil {
-			return nil, err
+			return EmptyQuery, err
 		}
 	}
 
@@ -103,7 +99,7 @@ func (s *Selector[T]) Build() (*Query, error) {
 	if len(s.groupBy) > 0 {
 		err = s.buildGroupBy()
 		if err != nil {
-			return nil, err
+			return EmptyQuery, err
 		}
 	}
 
@@ -111,7 +107,7 @@ func (s *Selector[T]) Build() (*Query, error) {
 	if len(s.orderBy) > 0 {
 		err = s.buildOrderBy()
 		if err != nil {
-			return nil, err
+			return EmptyQuery, err
 		}
 	}
 
@@ -120,7 +116,7 @@ func (s *Selector[T]) Build() (*Query, error) {
 		s.writeString(" HAVING ")
 		err = s.buildPredicates(s.having)
 		if err != nil {
-			return nil, err
+			return EmptyQuery, err
 		}
 	}
 
@@ -134,7 +130,7 @@ func (s *Selector[T]) Build() (*Query, error) {
 		s.parameter(s.limit)
 	}
 	s.end()
-	return &Query{SQL: s.buffer.String(), Args: s.args}, nil
+	return Query{SQL: s.buffer.String(), Args: s.args}, nil
 }
 
 func (s *Selector[T]) buildTable(table TableReference) error {
@@ -155,11 +151,14 @@ func (s *Selector[T]) buildTable(table TableReference) error {
 		if err := s.buildJoin(t); err != nil {
 			return err
 		}
+	case Subquery:
+		return s.buildSubquery(t, true)
 	default:
 		return errs.NewUnsupportedTableReferenceError(table)
 	}
 	return nil
 }
+
 func (s *Selector[T]) buildOrderBy() error {
 	s.writeString(" ORDER BY ")
 	for i, ob := range s.orderBy {
@@ -204,16 +203,15 @@ func (s *Selector[T]) buildAllColumns() error {
 
 // buildSelectedList users specify columns
 func (s *Selector[T]) buildSelectedList() error {
-	s.aliases = make(map[string]struct{})
 	for i, selectable := range s.columns {
 		if i > 0 {
 			s.comma()
 		}
 		switch expr := selectable.(type) {
 		case Column:
-			err := s.buildColumn(expr)
+			err := s.builder.buildColumn(expr)
 			if err != nil {
-				return err
+				return errs.NewInvalidFieldError(expr.name)
 			}
 		case columns:
 			for j, c := range expr.cs {
@@ -241,7 +239,7 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 		s.writeString("DISTINCT ")
 	}
 	cMeta, ok := s.meta.FieldMap[aggregate.arg]
-	s.aliases[aggregate.alias] = struct{}{}
+	// s.aliases[aggregate.alias] = struct{}{}
 	if !ok {
 		return errs.NewInvalidFieldError(aggregate.arg)
 	}
@@ -254,33 +252,16 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 	s.quote(cMeta.ColumnName)
 	s.writeByte(')')
 	if aggregate.alias != "" {
-		if _, ok := s.aliases[aggregate.alias]; ok {
-			s.writeString(" AS ")
-			s.quote(aggregate.alias)
-		}
+		// if _, ok := s.aliases[aggregate.alias]; ok {
+		// 	s.writeString(" AS ")
+		// 	s.quote(aggregate.alias)
+		// }
+		s.writeString(" AS ")
+		s.quote(aggregate.alias)
 	}
 	return nil
 }
 
-func (s *Selector[T]) buildColumn(column Column) error {
-	if column.table != nil {
-		if alias := column.table.getAlias(); alias != "" {
-			s.quote(alias)
-			s.point()
-		}
-	}
-	cMeta, ok := s.meta.FieldMap[column.name]
-	if !ok {
-		return errs.NewInvalidFieldError(column.name)
-	}
-	s.quote(cMeta.ColumnName)
-	if column.alias != "" {
-		s.aliases[column.alias] = struct{}{}
-		s.writeString(" AS ")
-		s.quote(column.alias)
-	}
-	return nil
-}
 func (s *Selector[T]) buildColumns(index int, name string) error {
 	if index > 0 {
 		s.comma()
@@ -360,6 +341,19 @@ func (s *Selector[T]) Offset(offset int) *Selector[T] {
 	return s
 }
 
+func (s *Selector[T]) AsSubquery(alias string) Subquery {
+	var table TableReference
+	if s.table == nil {
+		table = TableOf(new(T), alias)
+	}
+	return Subquery{
+		entity:  table,
+		q:       s,
+		alias:   alias,
+		columns: s.columns,
+	}
+}
+
 // Get 方法会执行查询，并且返回一条数据
 // 注意，在不同的数据库情况下，第一条数据可能是按照不同的列来排序的
 // 而且要注意，这个方法会强制设置 Limit 1
@@ -369,7 +363,7 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newQuerier[T](s.session, query, s.meta, SELECT).Get(ctx)
+	return newQuerier[T](s.Session, query, s.meta, SELECT).Get(ctx)
 }
 
 // OrderBy specify fields and ASC
@@ -404,7 +398,7 @@ func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newQuerier[T](s.session, query, s.meta, SELECT).GetMulti(ctx)
+	return newQuerier[T](s.Session, query, s.meta, SELECT).GetMulti(ctx)
 }
 
 func (s *Selector[T]) buildJoin(t Join) error {

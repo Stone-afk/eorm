@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,33 +16,31 @@ package eorm
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
-	"github.com/gotomicro/eorm/internal/errs"
-	"github.com/gotomicro/eorm/internal/valuer"
-
+	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/valyala/bytebufferpool"
 )
 
+var _ QueryBuilder = &Updater[any]{}
+
 // Updater is the builder responsible for building UPDATE query
 type Updater[T any] struct {
-	builder
-	session
-	table   interface{}
-	val     valuer.Value
-	where   []Predicate
-	assigns []Assignable
+	Session
+	updaterBuilder
+	table interface{}
 }
 
 // NewUpdater 开始构建一个 UPDATE 查询
-func NewUpdater[T any](sess session) *Updater[T] {
+func NewUpdater[T any](sess Session) *Updater[T] {
 	return &Updater[T]{
-		builder: builder{
-			core:   sess.getCore(),
-			buffer: bytebufferpool.Get(),
+		updaterBuilder: updaterBuilder{
+			builder: builder{
+				core:   sess.getCore(),
+				buffer: bytebufferpool.Get(),
+			},
 		},
-		session: sess,
+		Session: sess,
 	}
 }
 
@@ -52,7 +50,7 @@ func (u *Updater[T]) Update(val *T) *Updater[T] {
 }
 
 // Build returns UPDATE query
-func (u *Updater[T]) Build() (*Query, error) {
+func (u *Updater[T]) Build() (Query, error) {
 	defer bytebufferpool.Put(u.buffer)
 	var err error
 	t := new(T)
@@ -61,10 +59,10 @@ func (u *Updater[T]) Build() (*Query, error) {
 	}
 	u.meta, err = u.metaRegistry.Get(t)
 	if err != nil {
-		return nil, err
+		return EmptyQuery, err
 	}
 
-	u.val = u.valCreator.NewBasicTypeValue(u.table, u.meta)
+	u.val = u.valCreator.NewPrimitiveValue(u.table, u.meta)
 	u.args = make([]interface{}, 0, len(u.meta.Columns))
 
 	u.writeString("UPDATE ")
@@ -76,19 +74,19 @@ func (u *Updater[T]) Build() (*Query, error) {
 		err = u.buildAssigns()
 	}
 	if err != nil {
-		return nil, err
+		return EmptyQuery, err
 	}
 
 	if len(u.where) > 0 {
 		u.writeString(" WHERE ")
 		err = u.buildPredicates(u.where)
 		if err != nil {
-			return nil, err
+			return EmptyQuery, err
 		}
 	}
 
 	u.end()
-	return &Query{
+	return Query{
 		SQL:  u.buffer.String(),
 		Args: u.args,
 	}, nil
@@ -106,10 +104,10 @@ func (u *Updater[T]) buildAssigns() error {
 			if !ok {
 				return errs.NewInvalidFieldError(a.name)
 			}
-			val, _ := u.val.Field(a.name)
+			refVal, _ := u.val.Field(a.name)
 			u.quote(c.ColumnName)
 			_ = u.buffer.WriteByte('=')
-			u.parameter(val)
+			u.parameter(refVal.Interface())
 			has = true
 		case columns:
 			for _, name := range a.cs {
@@ -117,13 +115,13 @@ func (u *Updater[T]) buildAssigns() error {
 				if !ok {
 					return errs.NewInvalidFieldError(name)
 				}
-				val, _ := u.val.Field(name)
+				refVal, _ := u.val.Field(name)
 				if has {
 					u.comma()
 				}
 				u.quote(c.ColumnName)
 				_ = u.buffer.WriteByte('=')
-				u.parameter(val)
+				u.parameter(refVal.Interface())
 				has = true
 			}
 		case Assignment:
@@ -132,7 +130,7 @@ func (u *Updater[T]) buildAssigns() error {
 			}
 			has = true
 		default:
-			return fmt.Errorf("eorm: unsupported assignment %v", a)
+			return errs.ErrUnsupportedAssignment
 		}
 	}
 	if !has {
@@ -144,13 +142,19 @@ func (u *Updater[T]) buildAssigns() error {
 func (u *Updater[T]) buildDefaultColumns() error {
 	has := false
 	for _, c := range u.meta.Columns {
-		val, _ := u.val.Field(c.FieldName)
+		refVal, _ := u.val.Field(c.FieldName)
+		if u.ignoreZeroVal && isZeroValue(refVal) {
+			continue
+		}
+		if u.ignoreNilVal && isNilValue(refVal) {
+			continue
+		}
 		if has {
 			_ = u.buffer.WriteByte(',')
 		}
 		u.quote(c.ColumnName)
 		_ = u.buffer.WriteByte('=')
-		u.parameter(val)
+		u.parameter(refVal.Interface())
 		has = true
 	}
 	if !has {
@@ -171,61 +175,28 @@ func (u *Updater[T]) Where(predicates ...Predicate) *Updater[T] {
 	return u
 }
 
-// AssignNotNilColumns uses the non-nil value to construct the Assignable instances.
-func AssignNotNilColumns(entity interface{}) []Assignable {
-	return AssignColumns(entity, func(typ reflect.StructField, val reflect.Value) bool {
-		switch val.Kind() {
-		case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
-			return !val.IsNil()
-		}
-		return true
-	})
+// SkipNilValue 忽略 nil 值 columns
+func (u *Updater[T]) SkipNilValue() *Updater[T] {
+	u.ignoreNilVal = true
+	return u
 }
 
-// AssignNotZeroColumns uses the non-zero value to construct the Assignable instances.
-func AssignNotZeroColumns(entity interface{}) []Assignable {
-	return AssignColumns(entity, func(typ reflect.StructField, val reflect.Value) bool {
-		return !val.IsZero()
-	})
+func isNilValue(val reflect.Value) bool {
+	switch val.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
+		return val.IsNil()
+	}
+	return false
 }
 
-// AssignColumns will check all columns and then apply the filter function.
-// If the returned value is true, this column will be updated.
-func AssignColumns(entity interface{}, filter func(typ reflect.StructField, val reflect.Value) bool) []Assignable {
-	val := reflect.ValueOf(entity).Elem()
-	numField := val.NumField()
-
-	fdTypes := make([]reflect.StructField, 0, numField)
-	fdValues := make([]reflect.Value, 0, numField)
-	flapFields(entity, &fdTypes, &fdValues)
-
-	res := make([]Assignable, 0, len(fdTypes))
-	for i := 0; i < len(fdTypes); i++ {
-		fieldVal := fdValues[i]
-		fieldTyp := fdTypes[i]
-		if filter(fieldTyp, fieldVal) {
-			res = append(res, Assign(fieldTyp.Name, fieldVal.Interface()))
-		}
-	}
-	return res
+// SkipZeroValue 忽略零值 columns
+func (u *Updater[T]) SkipZeroValue() *Updater[T] {
+	u.ignoreZeroVal = true
+	return u
 }
 
-func flapFields(entity interface{}, fdTypes *[]reflect.StructField, fdValues *[]reflect.Value) {
-	typ := reflect.TypeOf(entity)
-	val := reflect.ValueOf(entity)
-	if typ.Kind() == reflect.Pointer {
-		typ = typ.Elem()
-		val = val.Elem()
-	}
-	numField := val.NumField()
-	for i := 0; i < numField; i++ {
-		if !typ.Field(i).Anonymous {
-			*fdTypes = append(*fdTypes, typ.Field(i))
-			*fdValues = append(*fdValues, val.Field(i))
-			continue
-		}
-		flapFields(val.Field(i).Interface(), fdTypes, fdValues)
-	}
+func isZeroValue(val reflect.Value) bool {
+	return val.IsZero()
 }
 
 // Exec sql
@@ -234,5 +205,5 @@ func (u *Updater[T]) Exec(ctx context.Context) Result {
 	if err != nil {
 		return Result{err: err}
 	}
-	return newQuerier[T](u.session, query, u.meta, UPDATE).Exec(ctx)
+	return newQuerier[T](u.Session, query, u.meta, UPDATE).Exec(ctx)
 }

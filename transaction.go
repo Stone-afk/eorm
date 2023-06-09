@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,34 +17,25 @@ package eorm
 import (
 	"context"
 	"database/sql"
+
+	"github.com/ecodeclub/eorm/internal/datasource"
 )
 
-// var _ session = &Tx{}
-var _ session = &DB{}
-
-// session 代表一个抽象的概念，即会话
-// 暂时做成私有的，后面考虑重构，因为这个东西用户可能有点难以理解
-type session interface {
-	getCore() core
-	queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	execContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-}
-
 type Tx struct {
-	tx *sql.Tx
-	db *DB
+	core
+	tx datasource.Tx
 }
 
 func (t *Tx) getCore() core {
-	return t.db.core
+	return t.core
 }
 
-func (t *Tx) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	return t.tx.QueryContext(ctx, query, args...)
+func (t *Tx) queryContext(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
+	return t.tx.Query(ctx, query)
 }
 
-func (t *Tx) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return t.tx.ExecContext(ctx, query, args...)
+func (t *Tx) execContext(ctx context.Context, query datasource.Query) (sql.Result, error) {
+	return t.tx.Exec(ctx, query)
 }
 
 func (t *Tx) Commit() error {

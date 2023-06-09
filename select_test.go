@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/datasource/single"
+
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/gotomicro/eorm/internal/errs"
-	"github.com/gotomicro/eorm/internal/test"
+	"github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,7 +36,7 @@ func TestRawQuery_Get_baseType(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = mockDB.Close() }()
-	db, err := openDB("mysql", mockDB)
+	db, err := OpenDS("mysql", single.NewDB(mockDB))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +142,7 @@ func TestRawQuery_GetMulti_baseType(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = mockDB.Close() }()
-	db, err := openDB("mysql", mockDB)
+	db, err := OpenDS("mysql", single.NewDB(mockDB))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,27 +283,25 @@ func TestSelector_Get_baseType(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = mockDB.Close() }()
-	db, err := openDB("mysql", mockDB)
+	db, err := OpenDS("mysql", single.NewDB(mockDB))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	testCases := []struct {
 		name      string
-		queryRes  func(t *testing.T) any
+		queryRes  func(t *testing.T) (any, error)
 		mockErr   error
 		mockOrder func(mock sqlmock.Sqlmock)
-		wantErr   error
+		wantErr   string
 		wantVal   any
 	}{
 		{
 			name: "res int",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[int](db).Select(C("Age")).From(tm)
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"age"}).AddRow(10)
@@ -316,12 +316,10 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "res int32",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[int32](db).Select(C("Age")).From(tm)
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"age"}).AddRow(10)
@@ -336,12 +334,10 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "res int64",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[int64](db).Select(C("Age")).From(tm)
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"age"}).AddRow(10)
@@ -356,12 +352,10 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "avg res float32",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[float32](db).Select(C("Age")).From(tm)
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"age"}).AddRow(10.2)
@@ -376,12 +370,10 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "avg res float64",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[float64](db).Select(C("Age")).From(tm)
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"age"}).AddRow(10.02)
@@ -396,13 +388,11 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "res byte",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[byte](db).Select(C("FirstName")).
 					From(tm).Where(C("Id").EQ(1))
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"first_name"}).AddRow('D')
@@ -417,13 +407,11 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "res bytes",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[[]byte](db).Select(C("FirstName")).
 					From(tm).Where(C("Id").EQ(1))
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"first_name"}).AddRow([]byte("Li"))
@@ -438,13 +426,11 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "res string",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[string](db).Select(C("FirstName")).
 					From(tm).Where(C("Id").EQ(1))
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"first_name"}).AddRow("Da")
@@ -459,12 +445,10 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "res struct ptr",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				queryer := NewSelector[TestModel](db).Select(C("FirstName"), C("Age")).
 					Where(C("Id").EQ(1))
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"first_name", "age"}).AddRow("Da", 18)
@@ -481,13 +465,11 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "res sql.NullString",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[sql.NullString](db).Select(C("LastName")).
 					From(tm).Where(C("Id").EQ(1))
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"last_name"}).AddRow([]byte("ming"))
@@ -499,12 +481,50 @@ func TestSelector_Get_baseType(t *testing.T) {
 				return &sql.NullString{String: "ming", Valid: true}
 			}(),
 		},
+		{
+			name: "res *int accept NULL",
+			queryRes: func(t *testing.T) (any, error) {
+				tm := TableOf(&TestModel{}, "t1")
+				queryer := NewSelector[*int](db).Select(C("Age")).
+					From(tm).Where(C("Id").EQ(1))
+				return queryer.Get(context.Background())
+			},
+			mockOrder: func(mock sqlmock.Sqlmock) {
+				rows := mock.NewRows([]string{"age"}).AddRow(nil)
+				mock.ExpectQuery("SELECT `age` FROM `test_model` AS `t1` WHERE `id`=? LIMIT ?;").
+					WithArgs(1, 1).
+					WillReturnRows(rows)
+			},
+			wantVal: func() **int {
+				return new(*int)
+			}(),
+		},
+		{
+			name: "res int accept NULL",
+			queryRes: func(t *testing.T) (any, error) {
+				tm := TableOf(&TestModel{}, "t1")
+				queryer := NewSelector[int](db).Select(C("Age")).
+					From(tm).Where(C("Id").EQ(1))
+				return queryer.Get(context.Background())
+			},
+			mockOrder: func(mock sqlmock.Sqlmock) {
+				rows := mock.NewRows([]string{"age"}).AddRow(nil)
+				mock.ExpectQuery("SELECT `age` FROM `test_model` AS `t1` WHERE `id`=? LIMIT ?;").
+					WithArgs(1, 1).
+					WillReturnRows(rows)
+			},
+			wantErr: "sql: Scan error on column index 0, name \"age\": converting NULL to int is unsupported",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.mockOrder(mock)
-			res := tc.queryRes(t)
+			res, err := tc.queryRes(t)
+			if err != nil {
+				assert.EqualError(t, err, tc.wantErr)
+				return
+			}
 			assert.Equal(t, tc.wantVal, res)
 		})
 	}
@@ -517,7 +537,7 @@ func TestSelector_GetMulti_baseType(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = mockDB.Close() }()
-	db, err := openDB("mysql", mockDB)
+	db, err := OpenDS("mysql", single.NewDB(mockDB))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -851,8 +871,8 @@ func TestSelectable(t *testing.T) {
 		},
 		{
 			name:     "alias in having",
-			builder:  NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).GroupBy("FirstName").Having(C("avg_age").LT(20)),
-			wantSql:  "SELECT `id`,`first_name`,AVG(`age`) AS `avg_age` FROM `test_model` GROUP BY `first_name` HAVING `avg_age`<?;",
+			builder:  NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).GroupBy("FirstName").Having(Avg("Age").LT(20)),
+			wantSql:  "SELECT `id`,`first_name`,AVG(`age`) AS `avg_age` FROM `test_model` GROUP BY `first_name` HAVING AVG(`age`)<?;",
 			wantArgs: []interface{}{20},
 		},
 		{
@@ -1013,7 +1033,10 @@ func TestSelectable(t *testing.T) {
 }
 
 func TestSelectableCombination(t *testing.T) {
-	db := memoryDB()
+	db, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	if err != nil {
+		t.Error(err)
+	}
 	testCases := []CommonTestCase{
 		{
 			name:    "simple",
@@ -1101,8 +1124,8 @@ func TestSelectableCombination(t *testing.T) {
 		},
 		{
 			name:     "alias in having",
-			builder:  NewSelector[TestCombinedModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("CreateTime").As("create")).GroupBy("FirstName").Having(C("create").LT(20)),
-			wantSql:  "SELECT `id`,`first_name`,AVG(`create_time`) AS `create` FROM `test_combined_model` GROUP BY `first_name` HAVING `create`<?;",
+			builder:  NewSelector[TestCombinedModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("CreateTime").As("create")).GroupBy("FirstName").Having(Avg("CreateTime").LT(20)),
+			wantSql:  "SELECT `id`,`first_name`,AVG(`create_time`) AS `create` FROM `test_combined_model` GROUP BY `first_name` HAVING AVG(`create_time`)<?;",
 			wantArgs: []interface{}{20},
 		},
 		{
@@ -1133,22 +1156,22 @@ type BaseEntity struct {
 
 type TestCombinedModel struct {
 	BaseEntity
-	Id        int64 `eorm:"auto_increment,primary_key"`
+	Id        int64 `eorm:"primary_key"`
 	FirstName string
 	Age       int8
 	LastName  *string
 }
 
 func ExampleSelector_OrderBy() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
 	query, _ := NewSelector[TestModel](db).OrderBy(ASC("Age")).Build()
-	fmt.Printf("case1\n%s", query.string())
+	fmt.Printf("case1\n%s", query.String())
 	query, _ = NewSelector[TestModel](db).OrderBy(ASC("Age", "Id")).Build()
-	fmt.Printf("case2\n%s", query.string())
+	fmt.Printf("case2\n%s", query.String())
 	query, _ = NewSelector[TestModel](db).OrderBy(ASC("Age"), ASC("Id")).Build()
-	fmt.Printf("case3\n%s", query.string())
+	fmt.Printf("case3\n%s", query.String())
 	query, _ = NewSelector[TestModel](db).OrderBy(ASC("Age"), DESC("Id")).Build()
-	fmt.Printf("case4\n%s", query.string())
+	fmt.Printf("case4\n%s", query.String())
 	// Output:
 	// case1
 	// SQL: SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` ORDER BY `age` ASC;
@@ -1166,13 +1189,13 @@ func ExampleSelector_OrderBy() {
 
 func ExampleSelector_Having() {
 	db := memoryDB()
-	query, _ := NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).GroupBy("FirstName").Having(C("avg_age").LT(20)).Build()
-	fmt.Printf("case1\n%s", query.string())
+	query, _ := NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).GroupBy("FirstName").Having(Avg("Age").LT(20)).Build()
+	fmt.Printf("case1\n%s", query.String())
 	query, err := NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).GroupBy("FirstName").Having(C("Invalid").LT(20)).Build()
 	fmt.Printf("case2\n%s", err)
 	// Output:
 	// case1
-	// SQL: SELECT `id`,`first_name`,AVG(`age`) AS `avg_age` FROM `test_model` GROUP BY `first_name` HAVING `avg_age`<?;
+	// SQL: SELECT `id`,`first_name`,AVG(`age`) AS `avg_age` FROM `test_model` GROUP BY `first_name` HAVING AVG(`age`)<?;
 	// Args: []interface {}{20}
 	// case2
 	// eorm: 未知字段 Invalid
@@ -1196,7 +1219,7 @@ func ExampleSelector_Select() {
 
 	for index, tc := range cases {
 		query, _ := tc.Build()
-		fmt.Printf("case%d:\n%s", index, query.string())
+		fmt.Printf("case%d:\n%s", index, query.String())
 	}
 	// Output:
 	// case0:
@@ -1229,7 +1252,7 @@ func ExampleSelector_Distinct() {
 
 	for index, tc := range cases {
 		query, _ := tc.Build()
-		fmt.Printf("case%d:\n%s", index, query.string())
+		fmt.Printf("case%d:\n%s", index, query.String())
 	}
 	// Output:
 	// case0:
@@ -1265,27 +1288,27 @@ func TestSelector_Join(t *testing.T) {
 	testCases := []struct {
 		name      string
 		s         QueryBuilder
-		wantQuery *Query
+		wantQuery Query
 		wantErr   error
 	}{
 		{
 			name: "specify table",
 			s:    NewSelector[Order](db).From(TableOf(&OrderDetail{}, "t1")),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL: "SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail` AS `t1`;",
 			},
 		},
 		{
 			name: "specify table with empty alias",
 			s:    NewSelector[Order](db).From(TableOf(&OrderDetail{}, "")),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL: "SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail`;",
 			},
 		},
 		{
 			name: "only NewSelector",
 			s:    NewSelector[Order](db),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL: "SELECT `id`,`using_col1`,`using_col2` FROM `order`;",
 			},
 		},
@@ -1297,7 +1320,7 @@ func TestSelector_Join(t *testing.T) {
 				t3 := t1.Join(t2).Using("UsingCol1", "UsingCol2")
 				return NewSelector[Order](db).Select(Raw("*")).From(t3)
 			}(),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL: "SELECT * FROM (`order` AS `t1` JOIN `order_detail` AS `t2` USING (`using_col1`,`using_col2`));",
 			},
 		},
@@ -1309,7 +1332,7 @@ func TestSelector_Join(t *testing.T) {
 				t3 := t1.Join(t2).Using("UsingCol1", "UsingCol2")
 				return NewSelector[Order](db).From(t3).Select(t1.C("UsingCol1"), t2.C("UsingCol1"))
 			}(),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL: "SELECT `t1`.`using_col1`,`t2`.`using_col1` FROM (`order` AS `t1` JOIN `order_detail` AS `t2` USING (`using_col1`,`using_col2`));",
 			},
 		},
@@ -1331,7 +1354,7 @@ func TestSelector_Join(t *testing.T) {
 				t3 := t1.Join(t2).Using("UsingCol1", "UsingCol2")
 				return NewSelector[Order](db).From(t3).Select(t1.Avg("UsingCol1").As("avg_using_col1"))
 			}(),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL: "SELECT AVG(`t1`.`using_col1`) AS `avg_using_col1` FROM (`order` AS `t1` JOIN `order_detail` AS `t2` USING (`using_col1`,`using_col2`));",
 			},
 		},
@@ -1353,7 +1376,7 @@ func TestSelector_Join(t *testing.T) {
 				t3 := t1.Join(t2).Using("UsingCol1", "UsingCol2")
 				return NewSelector[Order](db).Select(t1.AllColumns()).From(t3).Where(C("UsingCol1").EQ(10).And(C("UsingCol2").EQ(10)))
 			}(),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL:  "SELECT `t1`.* FROM (`order` AS `t1` JOIN `order_detail` AS `t2` USING (`using_col1`,`using_col2`)) WHERE (`using_col1`=?) AND (`using_col2`=?);",
 				Args: []interface{}{10, 10},
 			},
@@ -1366,7 +1389,7 @@ func TestSelector_Join(t *testing.T) {
 				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
 				return NewSelector[Order](db).Select(t1.AllColumns()).From(t3)
 			}(),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL: "SELECT `t1`.* FROM (`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`);",
 			},
 		},
@@ -1378,7 +1401,7 @@ func TestSelector_Join(t *testing.T) {
 				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
 				return NewSelector[Order](db).Select(t1.AllColumns()).From(t3).Where(C("UsingCol1").EQ(10).And(C("UsingCol2").EQ(10)))
 			}(),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL:  "SELECT `t1`.* FROM (`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) WHERE (`using_col1`=?) AND (`using_col2`=?);",
 				Args: []interface{}{10, 10},
 			},
@@ -1412,7 +1435,7 @@ func TestSelector_Join(t *testing.T) {
 				t3 := t1.LeftJoin(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
 				return NewSelector[Order](db).From(t3).Select(t1.Max("UsingCol1").As("UsingCol1"), t1.C("UsingCol2")).Where(t1.C("UsingCol2").EQ("UsingCol2_1").And(t1.C("UsingCol2").EQ("UsingCol2_2")))
 			}(),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL:  "SELECT MAX(`t1`.`using_col1`) AS `UsingCol1`,`t1`.`using_col2` FROM (`order` AS `t1` LEFT JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) WHERE (`t1`.`using_col2`=?) AND (`t1`.`using_col2`=?);",
 				Args: []interface{}{"UsingCol2_1", "UsingCol2_2"}},
 		},
@@ -1426,7 +1449,7 @@ func TestSelector_Join(t *testing.T) {
 				t5 := t3.Join(t4).On(t2.C("ItemId").EQ(t4.C("Id")))
 				return NewSelector[Order](db).Select(t1.AllColumns()).From(t5)
 			}(),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL: "SELECT `t1`.* FROM " +
 					"((`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) " +
 					"JOIN `item` AS `t4` ON `t2`.`item_id`=`t4`.`id`);",
@@ -1442,7 +1465,7 @@ func TestSelector_Join(t *testing.T) {
 				t5 := t3.RightJoin(t4).On(t2.C("ItemId").EQ(t4.C("Id")))
 				return NewSelector[Order](db).Select(t1.AllColumns()).From(t5)
 			}(),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL: "SELECT `t1`.* FROM ((`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) RIGHT JOIN `item` AS `t4` ON `t2`.`item_id`=`t4`.`id`);",
 			},
 		},
@@ -1456,7 +1479,7 @@ func TestSelector_Join(t *testing.T) {
 				t5 := t3.LeftJoin(t4).On(t2.C("ItemId").EQ(t4.C("Id")))
 				return NewSelector[Order](db).Select(t1.AllColumns()).From(t5)
 			}(),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL: "SELECT `t1`.* FROM ((`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) LEFT JOIN `item` AS `t4` ON `t2`.`item_id`=`t4`.`id`);",
 			},
 		},
@@ -1471,7 +1494,7 @@ func TestSelector_Join(t *testing.T) {
 				t5 := t3.Join(t4).On(t2.C("ItemId").EQ(t4.C("Id")))
 				return NewSelector[Order](db).From(t5).Select(t1.Avg("UsingCol1").As("UsingCol1"), t1.Avg("UsingCol2").As("UsingCol2"))
 			}(),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL: "SELECT AVG(`t1`.`using_col1`) AS `UsingCol1`,AVG(`t1`.`using_col2`) AS `UsingCol2` FROM ((`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) JOIN `item` AS `t4` ON `t2`.`item_id`=`t4`.`id`);",
 			},
 		},
@@ -1499,7 +1522,7 @@ func TestSelector_Join(t *testing.T) {
 				t5 := t3.Join(t4).On(t2.C("ItemId").EQ(t4.C("Id")))
 				return NewSelector[Order](db).From(t5).Select(t1.C("UsingCol1"), t1.C("UsingCol2"))
 			}(),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL: "SELECT `t1`.`using_col1`,`t1`.`using_col2` FROM " +
 					"((`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) " +
 					"JOIN `item` AS `t4` ON `t2`.`item_id`=`t4`.`id`);",
@@ -1528,7 +1551,7 @@ func TestSelector_Join(t *testing.T) {
 				t5 := t4.Join(t3).On(t2.C("ItemId").EQ(t4.C("Id")))
 				return NewSelector[Order](db).Select(t4.AllColumns()).From(t5)
 			}(),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL: "SELECT `t4`.* FROM (`item` AS `t4` JOIN (`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) ON `t2`.`item_id`=`t4`.`id`);",
 			},
 		},
@@ -1542,7 +1565,7 @@ func TestSelector_Join(t *testing.T) {
 				t5 := t4.Join(t3).On(t2.C("ItemId").EQ(t4.C("Id")))
 				return NewSelector[Order](db).From(t5).Select(t4.Sum("Id").As("sum_id"), t4.Min("Id").As("min_id"), t4.Max("Id").As("max_id"), t4.Sum("Id").As("t4_sum_id"), t4.Count("Id").As("t4_cnt_id"))
 			}(),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL: "SELECT SUM(`t4`.`id`) AS `sum_id`,MIN(`t4`.`id`) AS `min_id`,MAX(`t4`.`id`) AS `max_id`,SUM(`t4`.`id`) AS `t4_sum_id`,COUNT(`t4`.`id`) AS `t4_cnt_id` FROM (`item` AS `t4` JOIN (`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) ON `t2`.`item_id`=`t4`.`id`);",
 			},
 		},
@@ -1554,9 +1577,220 @@ func TestSelector_Join(t *testing.T) {
 				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
 				return NewSelector[test.Order](db).From(t3).Select(t1.Avg("UsingCol1").As("UsingCol1"))
 			}(),
-			wantQuery: &Query{
+			wantQuery: Query{
 				SQL: "SELECT AVG(`t1`.`using_col1`) AS `UsingCol1` FROM (`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`);",
 			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			q, err := tc.s.Build()
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantQuery, q)
+		})
+	}
+}
+
+func TestSelector_Subquery(t *testing.T) {
+	db := memoryDB()
+	type Order struct {
+		Id        int
+		UsingCol1 string
+		UsingCol2 string
+	}
+
+	type OrderDetail struct {
+		OrderId   int
+		ItemId    int
+		UsingCol1 string
+		UsingCol2 string
+	}
+
+	testCases := []struct {
+		name      string
+		s         QueryBuilder
+		wantQuery Query
+		wantErr   error
+	}{
+		// 子查詢
+		{
+			name: "from",
+			s: func() QueryBuilder {
+				sub := NewSelector[OrderDetail](db).AsSubquery("sub")
+				return NewSelector[Order](db).Select(Raw("*")).From(sub)
+			}(),
+			wantQuery: Query{
+				SQL: "SELECT * FROM (SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail`) AS `sub`;"},
+		},
+		{
+			name: "from & where",
+			s: func() QueryBuilder {
+				o1 := TableOf(&OrderDetail{}, "o1")
+				sub := NewSelector[OrderDetail](db).From(o1).Where(o1.C("OrderId").GT(18)).AsSubquery("sub")
+				return NewSelector[Order](db).Select(Raw("*")).From(sub)
+			}(),
+
+			wantQuery: Query{
+				SQL:  "SELECT * FROM (SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail` AS `o1` WHERE `o1`.`order_id`>?) AS `sub`;",
+				Args: []any{18},
+			},
+		},
+		{
+			name: "in",
+			s: func() QueryBuilder {
+				o1 := TableOf(&Order{}, "o1")
+				sub := NewSelector[OrderDetail](db).Select(C("OrderId")).AsSubquery("sub")
+				return NewSelector[Order](db).Select(o1.C("Id")).From(o1).Where(o1.C("Id").In(sub))
+			}(),
+			wantQuery: Query{
+				SQL: "SELECT `o1`.`id` FROM `order` AS `o1` WHERE `o1`.`id` IN (SELECT `order_id` FROM `order_detail`);"},
+		},
+		{
+			name: "all",
+			s: func() QueryBuilder {
+				o1 := TableOf(&Order{}, "o1")
+				sub := NewSelector[OrderDetail](db).Select(C("OrderId")).AsSubquery("sub")
+				return NewSelector[Order](db).Select(o1.C("Id"), o1.C("UsingCol1"), o1.C("UsingCol2")).From(o1).Where(o1.C("Id").GT(All(sub)))
+			}(),
+			wantQuery: Query{
+				SQL: "SELECT `o1`.`id`,`o1`.`using_col1`,`o1`.`using_col2` FROM `order` AS `o1` WHERE `o1`.`id`>ALL (SELECT `order_id` FROM `order_detail`);"},
+		},
+		{
+			name: "some and any",
+			s: func() QueryBuilder {
+				o1 := TableOf(&Order{}, "o1")
+				sub := NewSelector[OrderDetail](db).Select(C("OrderId")).AsSubquery("sub")
+				return NewSelector[Order](db).From(o1).Where(o1.C("Id").GT(Some(sub)), o1.C("Id").LT(Any(sub)))
+			}(),
+			wantQuery: Query{
+				SQL: "SELECT `id`,`using_col1`,`using_col2` FROM `order` AS `o1` WHERE (`o1`.`id`>SOME (SELECT `order_id` FROM `order_detail`)) AND (`o1`.`id`<ANY (SELECT `order_id` FROM `order_detail`));"},
+		},
+		{
+			name: "exist",
+			s: func() QueryBuilder {
+				sub := NewSelector[OrderDetail](db).Select(C("OrderId")).AsSubquery("sub")
+				return NewSelector[Order](db).Where(Exist(sub))
+			}(),
+			wantQuery: Query{
+				SQL: "SELECT `id`,`using_col1`,`using_col2` FROM `order` WHERE EXIST (SELECT `order_id` FROM `order_detail`);"},
+		},
+		{
+			name: "not exist",
+			s: func() QueryBuilder {
+				sub := NewSelector[OrderDetail](db).Select(C("OrderId")).AsSubquery("sub")
+				return NewSelector[Order](db).Where(Not(Exist(sub)))
+			}(),
+			wantQuery: Query{
+				SQL: "SELECT `id`,`using_col1`,`using_col2` FROM `order` WHERE NOT (EXIST (SELECT `order_id` FROM `order_detail`));"},
+		},
+		{
+			name: "aggregate",
+			s: func() QueryBuilder {
+				sub := NewSelector[OrderDetail](db).Select(C("OrderId")).AsSubquery("sub")
+				return NewSelector[Order](db).Select(Max("Id")).Where(Exist(sub))
+			}(),
+			wantQuery: Query{
+				SQL: "SELECT MAX(`id`) FROM `order` WHERE EXIST (SELECT `order_id` FROM `order_detail`);"},
+		},
+		{
+			name: "invalid column",
+			s: func() QueryBuilder {
+				sub := NewSelector[OrderDetail](db).Select(C("OrderId")).AsSubquery("sub")
+				return NewSelector[Order](db).Select(Max("invalid")).Where(Exist(sub))
+			}(),
+			wantErr: errs.NewInvalidFieldError("invalid"),
+		},
+		// Join 與 Subquery 一起使用測試
+		{
+			name: "join & subquery",
+			s: func() QueryBuilder {
+				sub1 := NewSelector[Order](db).AsSubquery("sub1")
+				sub := NewSelector[OrderDetail](db).AsSubquery("sub")
+				return NewSelector[Order](db).Select(sub.C("OrderId")).From(sub1.Join(sub).On(sub1.C("Id").EQ(sub.C("OrderId")))).Where()
+			}(),
+			wantQuery: Query{
+				SQL: "SELECT `sub`.`order_id` FROM ((SELECT `id`,`using_col1`,`using_col2` FROM `order`) AS `sub1` JOIN (SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail`) AS `sub` ON `sub1`.`id`=`sub`.`order_id`);"},
+		},
+		{
+			name: "left join & subquery",
+			s: func() QueryBuilder {
+				sub1 := NewSelector[Order](db).AsSubquery("sub1")
+				sub := NewSelector[OrderDetail](db).AsSubquery("sub")
+				return NewSelector[Order](db).Select(sub.C("OrderId")).From(sub1.LeftJoin(sub).On(sub1.C("Id").EQ(sub.C("OrderId")))).Where()
+			}(),
+			wantQuery: Query{
+				SQL: "SELECT `sub`.`order_id` FROM ((SELECT `id`,`using_col1`,`using_col2` FROM `order`) AS `sub1` LEFT JOIN (SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail`) AS `sub` ON `sub1`.`id`=`sub`.`order_id`);"},
+		},
+		{
+			name: "right join & subquery",
+			s: func() QueryBuilder {
+				sub1 := NewSelector[Order](db).AsSubquery("sub1")
+				sub := NewSelector[OrderDetail](db).AsSubquery("sub")
+				return NewSelector[Order](db).Select(sub.C("OrderId")).From(sub1.RightJoin(sub).On(sub1.C("Id").EQ(sub.C("OrderId")))).Where()
+			}(),
+			wantQuery: Query{
+				SQL: "SELECT `sub`.`order_id` FROM ((SELECT `id`,`using_col1`,`using_col2` FROM `order`) AS `sub1` RIGHT JOIN (SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail`) AS `sub` ON `sub1`.`id`=`sub`.`order_id`);"},
+		},
+		{
+			name: "right join & subquery & using",
+			s: func() QueryBuilder {
+				sub1 := NewSelector[OrderDetail](db).AsSubquery("sub1")
+				sub2 := NewSelector[OrderDetail](db).AsSubquery("sub2")
+				return NewSelector[Order](db).Select(sub1.C("OrderId")).From(sub1.RightJoin(sub2).Using("Id")).Where()
+			}(),
+			wantQuery: Query{
+				SQL: "SELECT `sub1`.`order_id` FROM ((SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail`) AS `sub1` RIGHT JOIN (SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail`) AS `sub2` USING (`id`));"},
+		},
+		{
+			name: "join & subquery & using",
+			s: func() QueryBuilder {
+				sub1 := NewSelector[OrderDetail](db).AsSubquery("sub1")
+				sub2 := NewSelector[OrderDetail](db).Select(sub1.C("OrderId")).From(sub1).AsSubquery("sub2")
+				t1 := TableOf(&Order{}, "")
+				return NewSelector[Order](db).Select(t1.C("Id")).From(sub2.Join(sub1).Using("Id")).Where()
+			}(),
+			wantQuery: Query{
+				SQL: "SELECT `id` FROM ((SELECT `sub1`.`order_id` FROM (SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail`) AS `sub1`) AS `sub2` JOIN (SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail`) AS `sub1` USING (`id`));"},
+		},
+		{
+			name: "invalid field",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}, "")
+				sub := NewSelector[OrderDetail](db).AsSubquery("sub")
+				return NewSelector[Order](db).Select(sub.C("Invalid")).From(t1.Join(sub).On(t1.C("Id").EQ(sub.C("OrderId")))).Where()
+			}(),
+			wantErr: errs.NewInvalidFieldError("Invalid"),
+		},
+		{
+			name: "invalid field in predicates",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}, "")
+				sub := NewSelector[OrderDetail](db).AsSubquery("sub")
+				return NewSelector[Order](db).Select(sub.C("OrderId")).From(t1.Join(sub).On(t1.C("Id").EQ(sub.C("Invalid")))).Where()
+			}(),
+			wantErr: errs.NewInvalidFieldError("Invalid"),
+		},
+		{
+			name: "invalid field in predicates with columns",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}, "")
+				sub := NewSelector[OrderDetail](db).Select(C("OrderId")).AsSubquery("sub")
+				return NewSelector[Order](db).Select(sub.C("Invalid")).From(t1.Join(sub).On(t1.C("Id").EQ(sub.C("OrderId")))).Where()
+			}(),
+			wantErr: errs.NewInvalidFieldError("Invalid"),
+		},
+		{
+			name: "invalid field in aggregate function",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}, "")
+				sub := NewSelector[OrderDetail](db).AsSubquery("sub")
+				return NewSelector[Order](db).Select(Max("Invalid")).From(t1.Join(sub).On(t1.C("Id").EQ(sub.C("OrderId")))).Where()
+			}(),
+			wantErr: errs.NewInvalidFieldError("Invalid"),
 		},
 	}
 

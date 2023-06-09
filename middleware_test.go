@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_Middleware(t *testing.T) {
@@ -59,15 +59,15 @@ func Test_Middleware(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			orm, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory",
+			db, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory",
 				DBWithMiddlewares(tc.mdls...))
 			if err != nil {
 				t.Error(err)
 			}
 			defer func() {
-				_ = orm.Close()
+				_ = db.Close()
 			}()
-			assert.EqualValues(t, tc.mdls, orm.ms)
+			assert.EqualValues(t, tc.mdls, db.ms)
 		})
 	}
 }
@@ -100,7 +100,6 @@ func Test_Middleware_order(t *testing.T) {
 			}
 		}
 	}
-
 	db, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory",
 		DBWithMiddlewares(mdl1, mdl2, mdl3, last))
 	require.NoError(t, err)
@@ -109,4 +108,32 @@ func Test_Middleware_order(t *testing.T) {
 	assert.Equal(t, errors.New("mock error"), err)
 	assert.Equal(t, "123", string(res))
 
+}
+
+func TestQueryContext(t *testing.T) {
+	testCases := []struct {
+		name    string
+		wantErr error
+		q       Query
+		qc      *QueryContext
+	}{
+		{
+			name: "one middleware",
+			q: Query{
+				SQL:  `SELECT * FROM user_tab WHERE id = ?;`,
+				Args: []any{1},
+			},
+			qc: &QueryContext{
+				q: Query{
+					SQL:  `SELECT * FROM user_tab WHERE id = ?;`,
+					Args: []any{1},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.EqualValues(t, tc.q, tc.qc.GetQuery())
+		})
+	}
 }
