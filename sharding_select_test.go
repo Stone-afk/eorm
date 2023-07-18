@@ -65,7 +65,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 		"0.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, err := OpenDS("sqlite3",
-		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+		shardingsource.NewShardingDataSource(ds), DBWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -626,7 +626,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 		"1.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, err := OpenDS("sqlite3",
-		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+		shardingsource.NewShardingDataSource(ds), DBWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -1493,7 +1493,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 		"0.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, err := OpenDS("sqlite3",
-		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+		shardingsource.NewShardingDataSource(ds), DBWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -2377,7 +2377,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 		"0.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, err := OpenDS("sqlite3",
-		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+		shardingsource.NewShardingDataSource(ds), DBWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -3291,7 +3291,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 		"1.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, err := OpenDS("sqlite3",
-		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+		shardingsource.NewShardingDataSource(ds), DBWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -4547,7 +4547,7 @@ func TestShardingSelector_Build(t *testing.T) {
 		"0.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, err := OpenDS("sqlite3",
-		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+		shardingsource.NewShardingDataSource(ds), DBWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -5803,7 +5803,7 @@ func TestShardingSelector_Build_Error(t *testing.T) {
 		"0.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, err := OpenDS("sqlite3",
-		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+		shardingsource.NewShardingDataSource(ds), DBWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -5908,7 +5908,7 @@ func TestShardingSelector_Build_Error(t *testing.T) {
 					shardingsource.NewShardingDataSource(map[string]datasource.DataSource{
 						"0.db.cluster.company.com:3306": MasterSlavesMemoryDB(),
 					}),
-					DBOptionWithMetaRegistry(reg))
+					DBWithMetaRegistry(reg))
 				require.NoError(t, err)
 				s := NewShardingSelector[Order](db).Where(C("UserId").EQ(123))
 				return s
@@ -5955,7 +5955,7 @@ func TestShardingSelector_Get(t *testing.T) {
 		"0.db.slave.company.com:3306": masterSlaveDB,
 	}
 	shardingDB, err := OpenDS("mysql",
-		shardingsource.NewShardingDataSource(m), DBOptionWithMetaRegistry(r))
+		shardingsource.NewShardingDataSource(m), DBWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -6145,7 +6145,7 @@ func TestShardingSelector_GetMulti(t *testing.T) {
 		"0.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, err := OpenDS("mysql",
-		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+		shardingsource.NewShardingDataSource(ds), DBWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
