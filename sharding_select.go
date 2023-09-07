@@ -307,8 +307,9 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 
 	var rowsSlice []rows.Rows
 	var eg errgroup.Group
-	for _, query := range qs {
+	for _, query := range sdQs {
 		q := query
+		//fmt.Println(q.String())
 		eg.Go(func() error {
 			//s.lock.Lock()
 			//defer s.lock.Unlock()
