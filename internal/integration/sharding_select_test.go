@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ecodeclub/eorm/internal/datasource"
+	"github.com/ecodeclub/eorm"
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 
 	"github.com/ecodeclub/eorm"

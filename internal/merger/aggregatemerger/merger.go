@@ -17,12 +17,13 @@ package aggregatemerger
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"sync"
 	_ "unsafe"
 
-	"github.com/ecodeclub/eorm/internal/merger"
+	"github.com/ecodeclub/eorm/internal/rows"
 
-	"github.com/ecodeclub/eorm/internal/merger/utils"
+	"github.com/ecodeclub/ekit/sqlx"
 
 	"github.com/ecodeclub/eorm/internal/merger/aggregatemerger/aggregator"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
@@ -46,7 +47,7 @@ func NewMerger(aggregators ...aggregator.Aggregator) *Merger {
 	}
 }
 
-func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
+func (m *Merger) Merge(ctx context.Context, results []rows.Rows) (rows.Rows, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -54,9 +55,8 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 		return nil, errs.ErrMergerEmptyRows
 	}
 	for _, res := range results {
-		err := m.checkColumns(res)
-		if err != nil {
-			return nil, err
+		if res == nil {
+			return nil, errs.ErrMergerRowsIsNull
 		}
 	}
 
@@ -70,15 +70,9 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 	}, nil
 
 }
-func (m *Merger) checkColumns(rows *sql.Rows) error {
-	if rows == nil {
-		return errs.ErrMergerRowsIsNull
-	}
-	return nil
-}
 
 type Rows struct {
-	rowsList    []*sql.Rows
+	rowsList    []rows.Rows
 	aggregators []aggregator.Aggregator
 	closed      bool
 	mu          *sync.RWMutex
@@ -86,6 +80,14 @@ type Rows struct {
 	cur         []any
 	columns     []string
 	nextCalled  bool
+}
+
+func (r *Rows) ColumnTypes() ([]*sql.ColumnType, error) {
+	return r.rowsList[0].ColumnTypes()
+}
+
+func (*Rows) NextResultSet() bool {
+	return false
 }
 
 func (r *Rows) Next() bool {
@@ -149,23 +151,18 @@ func (r *Rows) getSqlRowsData() ([][]any, error) {
 	}
 	return rowsData, nil
 }
-func (r *Rows) getSqlRowData(row *sql.Rows) ([]any, error) {
-
+func (*Rows) getSqlRowData(row rows.Rows) ([]any, error) {
 	var colsData []any
 	var err error
-	if row.Next() {
-		colsData, err = utils.Scan(row)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// sql.Rows迭代过程中发生报错，返回报错
-		if row.Err() != nil {
-			return nil, row.Err()
-		}
+	scanner, err := sqlx.NewSQLRowsScanner(row)
+	if err != nil {
+		return nil, err
+	}
+	colsData, err = scanner.Scan()
+	if errors.Is(err, sqlx.ErrNoMoreRows) {
 		return nil, errs.ErrMergerAggregateHasEmptyRows
 	}
-	return colsData, nil
+	return colsData, err
 }
 
 func (r *Rows) Scan(dest ...any) error {
@@ -182,7 +179,7 @@ func (r *Rows) Scan(dest ...any) error {
 		return errs.ErrMergerScanNotNext
 	}
 	for i := 0; i < len(dest); i++ {
-		err := utils.ConvertAssign(dest[i], r.cur[i])
+		err := rows.ConvertAssign(dest[i], r.cur[i])
 		if err != nil {
 			return err
 		}
