@@ -301,7 +301,6 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	mgr := batchmerger.NewMerger()
 	rowsList, err := s.db.queryMulti(ctx, qs)
 	if err != nil {

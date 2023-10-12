@@ -22,6 +22,9 @@ import (
 
 	"github.com/ecodeclub/eorm"
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
+
+	"github.com/ecodeclub/eorm"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 	"github.com/ecodeclub/eorm/internal/model"
 	"github.com/ecodeclub/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
